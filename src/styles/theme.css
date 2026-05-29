@@ -14,6 +14,17 @@
   --mono: 'JetBrains Mono', monospace;
 }
 
+:root.light {
+  --bg: #fafafa;
+  --surface: #ffffff;
+  --surface-hover: #f4f4f5;
+  --border: #e4e4e7;
+  --border-focus: #d4d4d8;
+  --text-main: #18181b;
+  --text-muted: #52525b;
+  --text-dim: #a1a1aa;
+}
+
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 body {
@@ -86,4 +97,43 @@ body {
 @keyframes popIn {
   0% { transform: scale(0.6); opacity: 0; }
   100% { transform: scale(1); opacity: 1; }
+}
+
+/* ── Floating XP ───────────────────────────────────── */
+.float-xp {
+  position: absolute;
+  font-family: var(--mono);
+  font-weight: 700;
+  font-size: 14px;
+  color: #10b981;
+  pointer-events: none;
+  animation: floatUp 1.2s ease-out forwards;
+  z-index: 10;
+}
+
+@keyframes floatUp {
+  0% { opacity: 0; transform: translateY(0) scale(0.8); }
+  20% { opacity: 1; transform: translateY(-10px) scale(1.1); }
+  80% { opacity: 1; transform: translateY(-30px) scale(1); }
+  100% { opacity: 0; transform: translateY(-40px) scale(1); }
+}
+
+/* ── Rank Up ───────────────────────────────────────── */
+.rank-up-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 150;
+  animation: fadeInOut 2.5s ease forwards;
+}
+.rank-up-text {
+  font-family: var(--mono);
+  font-size: 40px;
+  font-weight: 800;
+  color: #f59e0b;
+  text-shadow: 0 0 40px rgba(245, 158, 11, 0.4);
+  animation: popIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }

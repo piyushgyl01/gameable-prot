@@ -1,10 +1,12 @@
 import React from 'react';
 import { formatEnergyTime, xpMultiplier } from '../lib/systems';
+import { useGame } from '../context/GameContext';
 
 const DF_COL = { 1: '#10b981', 2: '#eab308', 3: '#ef4444' };
 const DF_LBL = { 1: 'Easy', 2: 'Med', 3: 'Hard' };
 
 export default function QuestCard({ quest, questState, currentLevel, onStart, onSkip, onComplete }) {
+  const { floatingXp } = useGame();
   const q = quest;
   const status = questState?.s || 'idle';
   const isDone = status === 'done';
@@ -62,8 +64,11 @@ export default function QuestCard({ quest, questState, currentLevel, onStart, on
       {/* Right */}
       <div style={{
         display: 'flex', flexDirection: 'column', alignItems: 'flex-end',
-        justifyContent: 'flex-end', gap: 6, flexShrink: 0,
+        justifyContent: 'flex-end', gap: 6, flexShrink: 0, position: 'relative',
       }}>
+        {floatingXp && floatingXp.id === q.id && (
+          <div className="float-xp">+{floatingXp.amount} XP</div>
+        )}
         <span style={{
           fontFamily: "'JetBrains Mono', monospace", fontSize: 13,
           fontWeight: 700, color: 'var(--text-dim)',

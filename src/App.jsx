@@ -4,11 +4,12 @@ import MainScreen from './screens/MainScreen';
 import StoryScreen from './screens/StoryScreen';
 import WorldScreen from './screens/WorldScreen';
 import StatsScreen from './screens/StatsScreen';
+import { xpRequired } from './lib/systems';
 
 const TABS = ['main', 'story', 'world', 'stats'];
 
 function GameApp() {
-  const { phase, startApp, name, level, xp, toastMsg, levelUpAlert } = useGame();
+  const { phase, startApp, name, level, xp, theme, toggleTheme, toastMsg, levelUpAlert, rankUpAlert } = useGame();
   const [tab, setTab] = useState('main');
   const [inputName, setInputName] = useState('');
 
@@ -59,7 +60,12 @@ function GameApp() {
     );
   }
 
-  // ── Main Game UI ───────────────────────────────────
+  const prevXpReq = level > 1 ? xpRequired(level - 1) : 0;
+  const nextXpReq = xpRequired(level);
+  const currentLevelXp = xp - prevXpReq;
+  const neededXp = nextXpReq - prevXpReq;
+  const xpPct = Math.min(100, Math.max(0, (currentLevelXp / neededXp) * 100));
+
   return (
     <div style={{ maxWidth: 680, margin: '0 auto', padding: '24px 16px 120px' }}>
       {/* Header */}
@@ -67,16 +73,39 @@ function GameApp() {
         <div style={{
           width: 44, height: 44, borderRadius: 12, background: 'var(--surface)',
           border: '1px solid var(--border)', display: 'grid', placeItems: 'center',
-          fontSize: '18px', fontWeight: 800, color: '#818cf8',
+          fontSize: '18px', fontWeight: 800, color: '#818cf8', flexShrink: 0,
         }}>
           {name.charAt(0).toUpperCase()}
         </div>
-        <div style={{ flex: 1 }}>
-          <div style={{ fontSize: '17px', fontWeight: 800 }}>{name}</div>
-          <div style={{ fontFamily: 'var(--mono)', fontSize: '11px', color: 'var(--text-muted)' }}>
-            Lv {level}
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2 }}>
+            <div style={{ fontSize: '17px', fontWeight: 800 }}>{name}</div>
+            <div style={{ fontFamily: 'var(--mono)', fontSize: '11px', color: 'var(--text-muted)' }}>
+              Lv {level}
+            </div>
+          </div>
+          {/* XP Progress Bar */}
+          <div style={{ height: 4, background: 'var(--border)', borderRadius: 2, overflow: 'hidden', marginTop: 4 }}>
+            <div style={{
+              height: '100%', width: xpPct + '%', background: '#818cf8',
+              transition: 'width 0.4s ease'
+            }} />
+          </div>
+          <div style={{ fontFamily: 'var(--mono)', fontSize: '9px', color: 'var(--text-dim)', marginTop: 2, textAlign: 'right' }}>
+            {currentLevelXp} / {neededXp} XP
           </div>
         </div>
+        <button
+          onClick={toggleTheme}
+          style={{
+            background: 'var(--surface)', border: '1px solid var(--border)',
+            borderRadius: 8, width: 36, height: 36, display: 'grid', placeItems: 'center',
+            cursor: 'pointer', fontSize: 16, color: 'var(--text-muted)', flexShrink: 0
+          }}
+          title="Toggle Theme"
+        >
+          {theme === 'dark' ? '☀️' : '🌙'}
+        </button>
       </div>
 
       {/* Tab Nav */}
@@ -111,7 +140,14 @@ function GameApp() {
       {/* Toast */}
       <div className={'toast' + (toastMsg ? ' show' : '')}>{toastMsg}</div>
 
-      {/* Level Up */}
+      {/* Rank Up Overlay */}
+      {rankUpAlert && (
+        <div className="rank-up-overlay">
+          <div className="rank-up-text">{rankUpAlert}</div>
+        </div>
+      )}
+
+      {/* Level Up Overlay */}
       {levelUpAlert && (
         <div className="level-up-overlay">
           <div>

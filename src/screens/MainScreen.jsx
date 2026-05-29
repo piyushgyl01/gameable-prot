@@ -8,7 +8,7 @@ import { formatEnergyTime } from '../lib/systems';
 export default function MainScreen() {
   const [filter, setFilter] = useState('all');
   const {
-    dailyPool, questStates, level, energy, xp, mastery, streaks,
+    dailyPool, questStates, level, energy, dailyXp, mastery, streaks, history, activityLog,
     startQuest, skipQuest, completeQuest, doNewDay, setCustomQuests,
   } = useGame();
 
@@ -52,34 +52,65 @@ export default function MainScreen() {
 
   const mono = { fontFamily: "'JetBrains Mono', monospace" };
 
+  // Weekly Heatmap Data
+  const last7Days = [];
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    last7Days.push(d.toISOString().slice(0, 10));
+  }
+
+  const formatTime = (ms) => {
+    const d = new Date(ms);
+    return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  };
+
   return (
     <div>
       {/* Summary header */}
       <div style={{
-        display: 'flex', alignItems: 'center', gap: 16,
         background: 'var(--surface)', border: '1px solid var(--border)',
         borderRadius: 12, padding: '14px 16px', marginBottom: 14,
       }}>
-        <ProgressRing percentage={percentage} />
-        <div style={{ flex: 1, display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
-          <div style={{ textAlign: 'center' }}>
-            <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 4 }}>Time Left</div>
-            <div style={{ ...mono, fontSize: 16, fontWeight: 700, color: isEnergyLow ? '#ef4444' : 'var(--text-main)' }}>
-              {formatEnergyTime(energy)}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+          <ProgressRing percentage={percentage} />
+          <div style={{ flex: 1, display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
+            <div style={{ textAlign: 'center' }}>
+              <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 4 }}>Time Left</div>
+              <div style={{ ...mono, fontSize: 16, fontWeight: 700, color: isEnergyLow ? '#ef4444' : 'var(--text-main)' }}>
+                {formatEnergyTime(energy)}
+              </div>
+            </div>
+            <div style={{ textAlign: 'center' }}>
+              <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 4 }}>Done</div>
+              <div style={{ ...mono, fontSize: 16, fontWeight: 700, color: 'var(--text-main)' }}>
+                {completedToday}/{totalToday}
+              </div>
+            </div>
+            <div style={{ textAlign: 'center' }}>
+              <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 4 }}>Daily XP</div>
+              <div style={{ ...mono, fontSize: 16, fontWeight: 700, color: '#818cf8' }}>
+                {dailyXp}
+              </div>
             </div>
           </div>
-          <div style={{ textAlign: 'center' }}>
-            <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 4 }}>Done</div>
-            <div style={{ ...mono, fontSize: 16, fontWeight: 700, color: 'var(--text-main)' }}>
-              {completedToday}/{totalToday}
-            </div>
-          </div>
-          <div style={{ textAlign: 'center' }}>
-            <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 4 }}>XP</div>
-            <div style={{ ...mono, fontSize: 16, fontWeight: 700, color: '#818cf8' }}>
-              {xp}
-            </div>
-          </div>
+        </div>
+
+        {/* Weekly Heatmap */}
+        <div style={{ display: 'flex', justifyContent: 'center', gap: 6, marginTop: 16 }}>
+          {last7Days.map(date => {
+            const count = history[date] || 0;
+            return (
+              <div
+                key={date}
+                title={`${date}: ${count} completed`}
+                style={{
+                  width: 12, height: 12, borderRadius: 3,
+                  background: count > 3 ? '#10b981' : count > 0 ? 'rgba(16,185,129,0.4)' : 'var(--border)',
+                }}
+              />
+            );
+          })}
         </div>
       </div>
 
@@ -135,6 +166,34 @@ export default function MainScreen() {
           No quests for this filter. Try "All" or start a New Day.
         </div>
       )}
+
+      {/* Activity Log */}
+      <div style={{ marginTop: 32 }}>
+        <div style={{
+          fontSize: 11, fontWeight: 700, letterSpacing: 1.5,
+          color: 'var(--text-dim)', textTransform: 'uppercase', marginBottom: 10,
+        }}>
+          Activity Log
+        </div>
+        <div style={{
+          background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10,
+          padding: 12, maxHeight: 150, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 8,
+        }}>
+          {activityLog.length === 0 && (
+            <div style={{ fontSize: 12, color: 'var(--text-dim)', textAlign: 'center' }}>No recent activity.</div>
+          )}
+          {activityLog.map((log, i) => (
+            <div key={i} style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+              <span style={{ ...mono, fontSize: 10, color: 'var(--text-dim)', paddingTop: 2, flexShrink: 0 }}>
+                {formatTime(log.time)}
+              </span>
+              <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+                {log.msg}
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
     </div>
   );
 }
