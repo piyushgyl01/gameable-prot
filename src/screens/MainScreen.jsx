@@ -12,6 +12,14 @@ export default function MainScreen() {
     startQuest, skipQuest, completeQuest, doNewDay, setCustomQuests,
   } = useGame();
 
+  const getPet = (lvl) => {
+    if (lvl < 5) return { icon: '🥚', name: 'Mystic Egg' };
+    if (lvl < 10) return { icon: '🐣', name: 'Hatchling' };
+    if (lvl < 15) return { icon: '🐥', name: 'Fledgling' };
+    return { icon: '🦅', name: 'Apex Familiar' };
+  };
+  const pet = getPet(level);
+
   const completedToday = Object.values(questStates).filter((s) => s?.s === 'done').length;
   const totalToday = dailyPool.length;
   const percentage = totalToday > 0 ? (completedToday / totalToday) * 100 : 0;
@@ -111,6 +119,28 @@ export default function MainScreen() {
               />
             );
           })}
+        </div>
+      </div>
+
+      {/* Pet UI */}
+      <div style={{
+        background: 'var(--surface)', border: '1px solid var(--border)',
+        borderRadius: 12, padding: '16px', marginBottom: 24,
+        display: 'flex', alignItems: 'center', gap: 16
+      }}>
+        <div style={{
+          width: 50, height: 50, borderRadius: 25, background: 'rgba(129,140,248,0.1)',
+          display: 'grid', placeItems: 'center', fontSize: 28, border: '1px solid rgba(129,140,248,0.3)'
+        }}>
+          {pet.icon}
+        </div>
+        <div>
+          <div style={{ fontSize: 11, color: 'var(--text-dim)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 2 }}>
+            Companion
+          </div>
+          <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-main)' }}>
+            {pet.name}
+          </div>
         </div>
       </div>
 

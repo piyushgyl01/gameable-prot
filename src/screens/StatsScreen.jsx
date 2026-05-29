@@ -9,7 +9,10 @@ import {
 } from 'recharts';
 
 export default function StatsScreen() {
-  const { totalXp, history, mastery, streaks, customQuests, resetGame, triggerImport } = useGame();
+  const { 
+    level, totalXp, history, mastery, streaks, customQuests, 
+    resetGame, triggerImport, playerClass, setPlayerClass 
+  } = useGame();
   const fileInputRef = useRef(null);
 
   const mono = { fontFamily: "'JetBrains Mono', monospace" };
@@ -231,6 +234,55 @@ export default function StatsScreen() {
           </div>
         );
       })}
+
+      {/* Class Selection */}
+      <div style={{
+        fontSize: 11, fontWeight: 700, letterSpacing: 1.5, marginTop: 30,
+        color: 'var(--text-dim)', textTransform: 'uppercase', marginBottom: 10,
+      }}>
+        Identity Class
+      </div>
+      <div style={{
+        background: 'var(--surface)', border: '1px solid var(--border)',
+        borderRadius: 10, padding: 14, marginBottom: 24
+      }}>
+        {level < 10 ? (
+          <div style={{ textAlign: 'center', color: 'var(--text-dim)', fontSize: 13 }}>
+            Reach Level 10 to unlock a Class Specialization.
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {[
+              { id: 'scholar', name: 'The Scholar', desc: '+20% XP from Mastery quests', icon: '📖' },
+              { id: 'athlete', name: 'The Athlete', desc: 'Max Energy raised to 300', icon: '⚡' },
+              { id: 'bard', name: 'The Bard', desc: 'Chain bonus scales 2x faster', icon: '🎵' },
+            ].map(cls => (
+              <div key={cls.id} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <div style={{ fontSize: 24 }}>{cls.icon}</div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: playerClass === cls.id ? '#eab308' : 'var(--text-main)' }}>
+                    {cls.name}
+                  </div>
+                  <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>{cls.desc}</div>
+                </div>
+                <button
+                  onClick={() => setPlayerClass(cls.id)}
+                  disabled={playerClass === cls.id}
+                  style={{
+                    padding: '6px 12px', borderRadius: 6, fontSize: 12, fontWeight: 700,
+                    border: playerClass === cls.id ? '1px solid var(--border)' : '1px solid rgba(234,179,8,0.5)',
+                    background: playerClass === cls.id ? 'transparent' : 'rgba(234,179,8,0.1)',
+                    color: playerClass === cls.id ? 'var(--text-dim)' : '#eab308',
+                    cursor: playerClass === cls.id ? 'default' : 'pointer'
+                  }}
+                >
+                  {playerClass === cls.id ? 'Active' : 'Choose'}
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
 
       {/* Data Management */}
       <div style={{

@@ -7,7 +7,7 @@ const DF_COL = { 1: '#10b981', 2: '#eab308', 3: '#ef4444' };
 const DF_LBL = { 1: 'Easy', 2: 'Med', 3: 'Hard' };
 
 export default function QuestCard({ quest, questState, currentLevel, onStart, onSkip, onComplete }) {
-  const { floatingXp } = useGame();
+  const { floatingXp, setFocusQuest } = useGame();
   const q = quest;
   const status = questState?.s || 'idle';
   const isDone = status === 'done';
@@ -126,16 +126,30 @@ export default function QuestCard({ quest, questState, currentLevel, onStart, on
         )}
 
         {isActive && (
-          <button
-            onClick={() => onComplete(q)}
-            style={{
-              fontSize: 12, padding: '4px 14px', borderRadius: 6,
-              background: '#16a34a', border: 'none',
-              color: '#fff', fontWeight: 600, cursor: 'pointer',
-            }}
-          >
-            Done
-          </button>
+          <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+            <button
+              onClick={() => onComplete(q)}
+              style={{
+                background: '#10b981', border: 'none', color: '#fff',
+                padding: '6px 12px', borderRadius: 6, fontSize: 12, fontWeight: 700, cursor: 'pointer',
+                flex: 1
+              }}
+            >
+              Complete
+            </button>
+            {q.en >= 15 && (
+              <button
+                onClick={() => setFocusQuest(q)}
+                style={{
+                  background: '#eab308', border: 'none', color: '#000',
+                  padding: '6px 12px', borderRadius: 6, fontSize: 12, fontWeight: 700, cursor: 'pointer',
+                  flex: 1
+                }}
+              >
+                Deep Focus
+              </button>
+            )}
+          </div>
         )}
       </div>
     </div>

@@ -57,6 +57,13 @@ export function GameProvider({ children }) {
   const [hp, setHp] = useState(100);
   const [gold, setGold] = useState(0);
 
+  // Identity & RPG
+  const [playerClass, setPlayerClass] = useState(null); // 'scholar', 'athlete', 'bard'
+  const [inventory, setInventory] = useState([]);
+  const [equipped, setEquipped] = useState({ accessory: null, head: null, body: null });
+  const [activeBoss, setActiveBoss] = useState(null);
+  const [achievements, setAchievements] = useState([]);
+
   // Progress
   const [mastery, setMastery] = useState({});
   const [streaks, setStreaks] = useState({});
@@ -82,6 +89,7 @@ export function GameProvider({ children }) {
   const [levelUpAlert, setLevelUpAlert] = useState(null);
   const [rankUpAlert, setRankUpAlert] = useState(null);
   const [floatingXp, setFloatingXp] = useState(null);
+  const [focusQuest, setFocusQuest] = useState(null);
 
   const addToLog = useCallback((msg) => {
     setActivityLog(prev => [{ time: Date.now(), msg }, ...prev].slice(0, 100));
@@ -104,6 +112,11 @@ export function GameProvider({ children }) {
     setWorldQuests(data.worldQuests || INITIAL_WORLD_QUESTS);
     setRewards(data.rewards || []);
     setActivityLog(data.activityLog || []);
+    setPlayerClass(data.playerClass || null);
+    setInventory(data.inventory || []);
+    setEquipped(data.equipped || { accessory: null, head: null, body: null });
+    setActiveBoss(data.activeBoss || null);
+    setAchievements(data.achievements || []);
 
     const today = getTodayString();
     if (data.gameDate !== today) {
@@ -158,13 +171,15 @@ export function GameProvider({ children }) {
         name, xp, level, energy, theme, hp, gold, mastery, streaks, history, totalXp,
         gameDate, dailyXp, chainBonus, activityLog, customQuests, storyQuests,
         worldQuests, rewards, dailyPool, questStates,
+        playerClass, inventory, equipped, activeBoss, achievements
       });
     }, 600);
     return () => clearTimeout(id);
   }, [
     phase, name, xp, level, energy, theme, hp, gold, mastery, streaks, history, totalXp,
     gameDate, dailyXp, chainBonus, activityLog, customQuests, storyQuests,
-    worldQuests, rewards, dailyPool, questStates
+    worldQuests, rewards, dailyPool, questStates,
+    playerClass, inventory, equipped, activeBoss, achievements
   ]);
 
   useEffect(() => {
@@ -176,8 +191,20 @@ export function GameProvider({ children }) {
     setTimeout(() => setToastMsg(null), 2500);
   }, []);
 
-  function earnXp(amount, sourceId) {
-    const earned = Math.round(amount * xpMultiplier(level));
+  function earnXp(amount, sourceId, sourcePillar) {
+    let mult = xpMultiplier(level);
+    
+    // Identity Class Buffs
+    if (playerClass === 'scholar' && sourcePillar === 'mastery') mult += 0.2;
+
+    // Gear Buffs
+    if (equipped.accessory === 'amulet_focus' && sourcePillar === 'mastery') mult += 0.1;
+    if (equipped.accessory === 'bonds_bracelet' && sourcePillar === 'bonds') mult += 0.2;
+
+    // Fatigued Debuff
+    if (hp < 30) mult -= 0.2;
+
+    const earned = Math.round(amount * Math.max(0.1, mult));
     setTotalXp((p) => p + earned);
     setDailyXp((p) => p + earned);
     setGold((p) => p + Math.round(earned / 2));
@@ -185,7 +212,6 @@ export function GameProvider({ children }) {
     const today = getTodayString();
     setHistory(prev => {
       const todayData = prev[today] || { count: 0, xp: 0 };
-      // Fallback for old history data shape
       if (typeof todayData === 'number') {
         return { ...prev, [today]: { count: todayData + (sourceId ? 1 : 0), xp: earned } };
       }
@@ -232,6 +258,11 @@ export function GameProvider({ children }) {
       if (qs.s === 'active') penalty += 10;
     });
     
+    // Vitality Ring buff
+    if (equipped.accessory === 'vitality_ring' && penalty > 0) {
+      penalty = Math.max(0, penalty - 5);
+    }
+
     if (penalty > 0) {
       setHp(prev => {
         const newHp = prev - penalty;
@@ -248,8 +279,25 @@ export function GameProvider({ children }) {
     }
 
     const today = getTodayString();
+    const d = new Date();
+    
+    // Adversary Check
+    if (d.getDay() === 1 && !activeBoss) {
+      setActiveBoss({ id: 'procrastination_demon', hp: 500, maxHp: 500 });
+      addToLog('A new Adversary has spawned!');
+    } else if (activeBoss && activeBoss.hp > 0) {
+      if (d.getDay() === 1) {
+        setHp(prev => {
+          showToast(`Failed to defeat Adversary. Lost 30 HP.`);
+          return prev - 30; // Boss Penalty
+        });
+        setActiveBoss({ id: 'procrastination_demon', hp: 500, maxHp: 500 });
+        addToLog('Adversary attacked you! Renewed for this week.');
+      }
+    }
+
     setGameDate(today);
-    setEnergy(MAX_ENERGY);
+    setEnergy(playerClass === 'athlete' ? 300 : equipped.head === 'crown_discipline' ? 290 : MAX_ENERGY);
     setQuestStates({});
     setDailyXp(0);
     setChainBonus({ pillar: null, count: 0 });
@@ -288,16 +336,19 @@ export function GameProvider({ children }) {
     addToLog(`Skipped ${q.nm}`);
   }
 
-  function completeQuest(q) {
+  function completeQuest(q, options = {}) {
     const st = questStates[q.id];
     if (!st || st.s !== 'active') return;
     
     // Chain bonus logic
-    let multiplier = 1;
+    let multiplier = options.focus ? 1.5 : 1;
+    let baseChain = equipped.body === 'cloak_shadows' ? 1.2 : 1.0;
+    const chainScale = playerClass === 'bard' ? 0.2 : 0.1;
+
     setChainBonus(prev => {
       if (prev.pillar === q.pillar) {
-        multiplier = 1 + ((prev.count + 1) * 0.1);
-        if (prev.count >= 2) showToast(`Chain Bonus: x${multiplier.toFixed(1)} XP!`);
+        multiplier *= (baseChain + ((prev.count + 1) * chainScale));
+        if (prev.count >= 2) showToast(`Chain Bonus!`);
         return { pillar: q.pillar, count: prev.count + 1 };
       }
       return { pillar: q.pillar, count: 1 };
@@ -313,8 +364,27 @@ export function GameProvider({ children }) {
       const yStr = yesterday.toISOString().slice(0, 10);
       let nc = (old.d === yStr || old.d === today) ? old.c + 1 : 1;
       if (old.d === today) nc = old.c;
+      
+      // Achievement: Unbreakable
+      if (nc >= 10 && !achievements.includes('unbreakable')) {
+        setAchievements(a => [...a, 'unbreakable']);
+        showToast('Achievement Unlocked: Unbreakable (10 day streak)!');
+      }
+
       return { ...prev, [q.mqId]: { c: nc, d: today } };
     });
+
+    // Achievement: Early Bird
+    if (new Date().getHours() < 8 && !achievements.includes('early_bird')) {
+      setAchievements(a => [...a, 'early_bird']);
+      showToast('Achievement Unlocked: Early Bird!');
+    }
+
+    // Achievement: Deep Thinker
+    if (options.focus && !achievements.includes('deep_thinker')) {
+      setAchievements(a => [...a, 'deep_thinker']);
+      showToast('Achievement Unlocked: Deep Thinker!');
+    }
 
     // Mastery & Rank up
     let rankUp = false;
@@ -337,8 +407,41 @@ export function GameProvider({ children }) {
       addToLog(`Rank Up: ${q.mqNm} reached Rank ${lbl}`);
     }
 
-    const earned = earnXp(Math.round(q.xp * multiplier), q.id);
-    addToLog(`Completed ${q.nm} (+${earned} XP)`);
+    const earned = earnXp(Math.round(q.xp * multiplier), q.id, q.pillar);
+    addToLog(`Completed ${q.nm} (+${earned} XP)${options.focus ? ' [FOCUS]' : ''}`);
+
+    // Mystery Drop (Tier 3)
+    if (q.t === 3 && Math.random() < 0.1) {
+      const isGold = Math.random() < 0.5;
+      if (isGold) {
+        const bonusGold = Math.floor(Math.random() * 200) + 100;
+        setGold(g => g + bonusGold);
+        showToast(`Mystery Drop! Found ${bonusGold} Gold.`);
+      } else {
+        const gearOptions = ['amulet_focus', 'vitality_ring', 'bonds_bracelet', 'crown_discipline', 'cloak_shadows'];
+        const drop = gearOptions[Math.floor(Math.random() * gearOptions.length)];
+        setInventory(prev => prev.includes(drop) ? prev : [...prev, drop]);
+        showToast(`Mystery Drop! Found Gear.`);
+      }
+    }
+
+    // Adversary Damage
+    if (activeBoss && activeBoss.hp > 0) {
+      const damage = Math.round(earned * 0.5); // Damage = 50% of XP earned
+      setActiveBoss(prev => {
+        const newHp = prev.hp - damage;
+        if (newHp <= 0) {
+          setTimeout(() => {
+            showToast(`DEFEATED ADVERSARY! Found 500 Gold!`);
+            setGold(g => g + 500);
+            setActiveBoss(null);
+          }, 1000);
+          return { ...prev, hp: 0 };
+        }
+        return { ...prev, hp: newHp };
+      });
+      addToLog(`Dealt ${damage} DMG to Boss`);
+    }
   }
 
   function toggleStoryTask(chapterId, taskId) {
@@ -401,7 +504,10 @@ export function GameProvider({ children }) {
       storyQuests, setStoryQuests, toggleStoryTask,
       worldQuests, setWorldQuests, toggleWorldTask,
       dailyPool, questStates, startQuest, skipQuest, completeQuest, doNewDay,
-      toastMsg, showToast, levelUpAlert, rankUpAlert, floatingXp
+      toastMsg, showToast, levelUpAlert, rankUpAlert, floatingXp,
+      playerClass, setPlayerClass, inventory, setInventory, equipped, setEquipped,
+      activeBoss, setActiveBoss, achievements, setAchievements,
+      focusQuest, setFocusQuest
     }}>
       {children}
     </GameContext.Provider>

@@ -5,9 +5,11 @@ import StoryScreen from './screens/StoryScreen';
 import WorldScreen from './screens/WorldScreen';
 import StatsScreen from './screens/StatsScreen';
 import ShopScreen from './screens/ShopScreen';
+import BossScreen from './screens/BossScreen';
+import FocusScreen from './screens/FocusScreen';
 import { xpRequired } from './lib/systems';
 
-const TABS = ['main', 'story', 'world', 'stats', 'shop'];
+const TABS = ['main', 'story', 'world', 'boss', 'stats', 'shop'];
 
 function GameApp() {
   const { phase, startApp, name, level, xp, hp, gold, energy, theme, toggleTheme, toastMsg, levelUpAlert, rankUpAlert } = useGame();
@@ -159,6 +161,7 @@ function GameApp() {
       {tab === 'main' && <MainScreen />}
       {tab === 'story' && <StoryScreen />}
       {tab === 'world' && <WorldScreen />}
+      {tab === 'boss' && <BossScreen />}
       {tab === 'stats' && <StatsScreen />}
       {tab === 'shop' && <ShopScreen />}
 
@@ -181,6 +184,9 @@ function GameApp() {
           </div>
         </div>
       )}
+
+      {/* Focus Overlay */}
+      <FocusScreen />
     </div>
   );
 }

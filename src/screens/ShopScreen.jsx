@@ -1,56 +1,147 @@
 import React, { useState } from 'react';
 import { useGame } from '../context/GameContext';
+import { GEAR_DB } from '../lib/gear';
 
 export default function ShopScreen() {
-  const { gold, setGold, rewards, setRewards, showToast } = useGame();
-  const [showAdd, setShowAdd] = useState(false);
+  const { gold, setGold, rewards, setRewards, inventory, equipped, setEquipped, showToast } = useGame();
+  
   const [newTitle, setNewTitle] = useState('');
   const [newCost, setNewCost] = useState(100);
+  const [showAdd, setShowAdd] = useState(false);
 
   const mono = { fontFamily: "'JetBrains Mono', monospace" };
 
-  const handleAdd = () => {
-    if (!newTitle.trim() || newCost <= 0) return;
-    setRewards(prev => [...prev, {
-      id: 'r_' + Date.now(),
-      nm: newTitle.trim(),
-      cost: newCost,
-    }]);
+  const handleAddReward = (e) => {
+    e.preventDefault();
+    if (!newTitle.trim()) return;
+    setRewards([...rewards, { id: 'r_' + Date.now(), nm: newTitle.trim(), cost: newCost }]);
     setNewTitle('');
     setNewCost(100);
     setShowAdd(false);
   };
 
-  const handlePurchase = (reward) => {
-    if (gold < reward.cost) {
+  const handleBuyCustom = (r) => {
+    if (gold < r.cost) {
       showToast('Not enough gold!');
       return;
     }
-    if (window.confirm(`Buy ${reward.nm} for ${reward.cost}G?`)) {
-      setGold(g => g - reward.cost);
-      showToast(`Purchased: ${reward.nm}`);
+    if (window.confirm(`Buy ${r.nm} for ${r.cost} Gold?`)) {
+      setGold(g => g - r.cost);
+      showToast(`Enjoy your reward: ${r.nm}!`);
     }
   };
 
-  const handleDelete = (id) => {
-    setRewards(prev => prev.filter(r => r.id !== id));
+  const handleDeleteCustom = (e, rId) => {
+    e.stopPropagation();
+    setRewards(rewards.filter(r => r.id !== rId));
+  };
+
+  const handleBuyGear = (g) => {
+    if (gold < g.cost) return;
+    if (window.confirm(`Buy ${g.name} for ${g.cost} Gold?`)) {
+      setGold(prev => prev - g.cost);
+      setInventory(prev => [...prev, g.id]);
+      setEquipped(prev => ({ ...prev, [g.slot]: g.id }));
+      showToast(`Equipped ${g.name}`);
+    }
+  };
+
+  const handleEquip = (gId) => {
+    const gear = GEAR_DB.find(x => x.id === gId);
+    if (gear) {
+      setEquipped(prev => ({ ...prev, [gear.slot]: gear.id }));
+      showToast(`Equipped ${gear.name}`);
+    }
   };
 
   return (
     <div style={{ padding: '0 2px' }}>
-      {/* Header */}
+      {/* Wealth Header */}
+      <div style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        background: 'rgba(234,179,8,0.1)', border: '1px solid #eab308',
+        borderRadius: 10, padding: '16px 20px', marginBottom: 24,
+      }}>
+        <div style={{ fontSize: 13, color: '#eab308', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1 }}>
+          Current Wealth
+        </div>
+        <div style={{ ...mono, fontSize: 24, fontWeight: 800, color: '#eab308' }}>
+          {gold} G
+        </div>
+      </div>
+
+      {/* Equipment Slots */}
+      <div style={{
+        fontSize: 11, fontWeight: 700, letterSpacing: 1.5,
+        color: 'var(--text-dim)', textTransform: 'uppercase', marginBottom: 14,
+      }}>
+        Equipped Gear
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10, marginBottom: 24 }}>
+        {['head', 'body', 'accessory'].map(slot => {
+          const item = GEAR_DB.find(x => x.id === equipped[slot]);
+          return (
+            <div key={slot} style={{
+              background: 'var(--surface)', border: '1px solid var(--border)',
+              borderRadius: 8, padding: 10, textAlign: 'center'
+            }}>
+              <div style={{ fontSize: 20 }}>{item ? item.icon : '⬛'}</div>
+              <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-dim)', marginTop: 4, textTransform: 'capitalize' }}>
+                {slot}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Gear Shop */}
+      <div style={{
+        fontSize: 11, fontWeight: 700, letterSpacing: 1.5,
+        color: 'var(--text-dim)', textTransform: 'uppercase', marginBottom: 14,
+      }}>
+        Gear Shop
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 30 }}>
+        {GEAR_DB.map(g => {
+          const isOwned = inventory.includes(g.id);
+          const isEquipped = equipped[g.slot] === g.id;
+          
+          return (
+            <div key={g.id} style={{
+              background: 'var(--surface)', border: '1px solid var(--border)',
+              borderRadius: 8, padding: '12px 14px', display: 'flex', alignItems: 'center', gap: 12
+            }}>
+              <div style={{ fontSize: 24 }}>{g.icon}</div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 14, fontWeight: 700 }}>{g.name}</div>
+                <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>{g.desc}</div>
+              </div>
+              <button
+                onClick={() => isOwned ? handleEquip(g.id) : handleBuyGear(g)}
+                disabled={isEquipped || (!isOwned && gold < g.cost)}
+                style={{
+                  padding: '6px 12px', borderRadius: 6, fontSize: 12, fontWeight: 700,
+                  border: isEquipped ? '1px solid var(--border)' : 'none',
+                  background: isEquipped ? 'transparent' : 'rgba(234,179,8,0.2)',
+                  color: isEquipped ? 'var(--text-dim)' : '#eab308',
+                  cursor: isEquipped || (!isOwned && gold < g.cost) ? 'default' : 'pointer',
+                  opacity: (!isOwned && gold < g.cost) ? 0.5 : 1
+                }}
+              >
+                {isEquipped ? 'Equipped' : isOwned ? 'Equip' : `${g.cost} G`}
+              </button>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Custom Rewards */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
         <span style={{
           fontSize: 11, fontWeight: 700, letterSpacing: 1.5,
           color: 'var(--text-dim)', textTransform: 'uppercase',
         }}>
-          Shop
-        </span>
-        <span style={{
-          fontSize: 10, fontWeight: 600, padding: '2px 8px', borderRadius: 6,
-          background: 'rgba(234,179,8,0.1)', color: '#eab308',
-        }}>
-          Rewards
+          Custom Rewards
         </span>
         <div style={{ flex: 1 }} />
         <button
@@ -65,19 +156,8 @@ export default function ShopScreen() {
         </button>
       </div>
 
-      <div style={{
-        background: 'var(--surface)', border: '1px solid var(--border)',
-        borderRadius: 12, padding: '14px 16px', marginBottom: 20,
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between'
-      }}>
-        <div style={{ fontSize: 13, color: 'var(--text-dim)', fontWeight: 600 }}>Your Balance</div>
-        <div style={{ ...mono, fontSize: 24, fontWeight: 800, color: '#eab308' }}>
-          💰 {gold}
-        </div>
-      </div>
-
       {showAdd && (
-        <div style={{
+        <form onSubmit={handleAddReward} style={{
           background: 'var(--surface)', border: '1px solid var(--border)',
           borderRadius: 10, padding: 14, marginBottom: 12,
           display: 'flex', flexDirection: 'column', gap: 8,
@@ -102,7 +182,7 @@ export default function ShopScreen() {
             }}
           />
           <button
-            onClick={handleAdd}
+            type="submit"
             style={{
               fontSize: 12, fontWeight: 600, padding: '6px 14px', borderRadius: 8,
               background: 'rgba(234,179,8,0.12)', border: '1px solid rgba(234,179,8,0.3)',
@@ -111,7 +191,7 @@ export default function ShopScreen() {
           >
             Add Reward
           </button>
-        </div>
+        </form>
       )}
 
       {/* Rewards Grid */}
@@ -127,7 +207,7 @@ export default function ShopScreen() {
               <div style={{ ...mono, fontSize: 12, color: '#eab308', marginTop: 2 }}>{r.cost} G</div>
             </div>
             <button
-              onClick={() => handlePurchase(r)}
+              onClick={() => handleBuyCustom(r)}
               style={{
                 fontSize: 12, fontWeight: 600, padding: '6px 16px', borderRadius: 8,
                 background: gold >= r.cost ? '#eab308' : 'var(--surface-hover)',
@@ -138,7 +218,7 @@ export default function ShopScreen() {
               Buy
             </button>
             <button
-              onClick={() => handleDelete(r.id)}
+              onClick={(e) => handleDeleteCustom(e, r.id)}
               style={{
                 fontSize: 14, padding: '4px', background: 'transparent', border: 'none',
                 color: 'var(--text-dim)', cursor: 'pointer'
