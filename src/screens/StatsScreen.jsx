@@ -3,6 +3,10 @@ import { useGame } from '../context/GameContext';
 import { MAIN_QUESTS, PILLARS } from '../lib/quests';
 import { getRankLabel, getRankIndex } from '../lib/systems';
 import { exportGameState } from '../lib/storage';
+import {
+  ResponsiveContainer, RadarChart, PolarGrid, PolarAngleAxis, Radar,
+  LineChart, Line, XAxis, Tooltip, CartesianGrid
+} from 'recharts';
 
 export default function StatsScreen() {
   const { totalXp, history, mastery, streaks, customQuests, resetGame, triggerImport } = useGame();
@@ -10,9 +14,61 @@ export default function StatsScreen() {
 
   const mono = { fontFamily: "'JetBrains Mono', monospace" };
 
-  const questsDone = Object.values(history || {}).reduce((sum, count) => sum + count, 0);
+  // Calculate history with the new {count, xp} structure
+  const getHistCount = (d) => typeof history[d] === 'number' ? history[d] : (history[d]?.count || 0);
+  const getHistXp = (d) => typeof history[d] === 'number' ? 0 : (history[d]?.xp || 0);
+
+  const questsDone = Object.keys(history || {}).reduce((sum, d) => sum + getHistCount(d), 0);
   const bestStreak = Math.max(0, ...Object.values(streaks || {}).map((s) => s.c || 0));
   const daysPlayed = Object.keys(history || {}).length;
+
+  const statCards = [
+    { label: 'Total XP', value: totalXp || 0, color: '#818cf8' },
+    { label: 'Quests Done', value: questsDone, color: '#10b981' },
+    { label: 'Best Streak', value: bestStreak, color: '#eab308' },
+    { label: 'Days Played', value: daysPlayed, color: 'var(--text-main)' },
+  ];
+
+  // Pillar Stats (for Radar Chart)
+  const pillarStats = Object.keys(PILLARS).map(pKey => {
+    const pData = PILLARS[pKey];
+    const mqs = MAIN_QUESTS.filter(mq => mq.p === pKey);
+    const totalRanks = mqs.reduce((sum, mq) => sum + getRankIndex(mastery[mq.id] || 0), 0);
+    return { key: pKey, subject: pData.name, fullMark: 25, value: totalRanks, color: pData.color };
+  });
+
+  // Last 14 days XP history (for Line Chart)
+  const last14Days = [];
+  for (let i = 13; i >= 0; i--) {
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    const dateStr = d.toISOString().slice(0, 10);
+    last14Days.push({
+      date: dateStr.slice(5), // MM-DD
+      xp: getHistXp(dateStr)
+    });
+  }
+
+  // Monthly Retrospective & Analytics
+  const currentMonthPrefix = new Date().toISOString().slice(0, 7); // YYYY-MM
+  const monthDays = Object.keys(history || {}).filter(d => d.startsWith(currentMonthPrefix));
+  const monthQuests = monthDays.reduce((sum, d) => sum + getHistCount(d), 0);
+
+  // Time Analytics
+  const { activityLog } = useGame();
+  const hourCounts = {};
+  activityLog.forEach(log => {
+    if (log.msg.includes('Completed')) {
+      const h = new Date(log.time).getHours();
+      hourCounts[h] = (hourCounts[h] || 0) + 1;
+    }
+  });
+  let bestHour = -1;
+  let maxC = 0;
+  Object.entries(hourCounts).forEach(([h, c]) => {
+    if (c > maxC) { maxC = c; bestHour = h; }
+  });
+  const bestTime = bestHour >= 0 ? new Date(0,0,0,bestHour).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : 'N/A';
 
   const handleReset = () => {
     if (window.confirm('Reset ALL game data? This cannot be undone.')) {
@@ -22,25 +78,17 @@ export default function StatsScreen() {
     }
   };
 
-  const statCards = [
-    { label: 'Total XP', value: totalXp || 0, color: '#818cf8' },
-    { label: 'Quests Done', value: questsDone, color: '#10b981' },
-    { label: 'Best Streak', value: bestStreak, color: '#eab308' },
-    { label: 'Days Played', value: daysPlayed, color: 'var(--text-main)' },
-  ];
-
-  // Pillar Stats
-  const pillarStats = Object.keys(PILLARS).map(pKey => {
-    const pData = PILLARS[pKey];
-    const mqs = MAIN_QUESTS.filter(mq => mq.p === pKey);
-    const totalRanks = mqs.reduce((sum, mq) => sum + getRankIndex(mastery[mq.id] || 0), 0);
-    return { key: pKey, label: pData.n, color: pData.c, ranks: totalRanks };
-  });
-
-  // Monthly Retrospective
-  const currentMonthPrefix = new Date().toISOString().slice(0, 7); // YYYY-MM
-  const monthDays = Object.keys(history || {}).filter(d => d.startsWith(currentMonthPrefix));
-  const monthQuests = monthDays.reduce((sum, d) => sum + (history[d] || 0), 0);
+  const CustomTooltip = ({ active, payload, label }) => {
+    if (active && payload && payload.length) {
+      return (
+        <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', padding: '8px 12px', borderRadius: 8 }}>
+          <p style={{ ...mono, fontSize: 11, color: 'var(--text-dim)', margin: '0 0 4px 0' }}>{label}</p>
+          <p style={{ ...mono, fontSize: 13, color: '#818cf8', margin: 0, fontWeight: 700 }}>{payload[0].value} XP</p>
+        </div>
+      );
+    }
+    return null;
+  };
 
   return (
     <div>
@@ -69,27 +117,56 @@ export default function StatsScreen() {
         ))}
       </div>
 
-      {/* Pillar Stats */}
+      {/* Time Analytics */}
+      <div style={{
+        background: 'var(--surface)', border: '1px solid var(--border)',
+        borderRadius: 10, padding: '14px 16px', marginBottom: 24, display: 'flex', alignItems: 'center', justifyContent: 'space-between'
+      }}>
+        <div style={{ fontSize: 13, color: 'var(--text-dim)', fontWeight: 600 }}>Prime Time</div>
+        <div style={{ ...mono, fontSize: 16, fontWeight: 800, color: '#eab308' }}>
+          🕒 {bestTime}
+        </div>
+      </div>
+
+      {/* Radar Chart */}
       <div style={{
         fontSize: 11, fontWeight: 700, letterSpacing: 1.5,
         color: 'var(--text-dim)', textTransform: 'uppercase', marginBottom: 10,
       }}>
-        Character Sheet
+        Build Shape
       </div>
-      <div style={{ display: 'flex', gap: 10, marginBottom: 24 }}>
-        {pillarStats.map(ps => (
-          <div key={ps.key} style={{
-            flex: 1, background: 'var(--surface)', border: `1px solid ${ps.color}40`,
-            borderRadius: 10, padding: 12, textAlign: 'center',
-          }}>
-            <div style={{ fontSize: 11, color: ps.color, marginBottom: 4, fontWeight: 700 }}>
-              {ps.label}
-            </div>
-            <div style={{ ...mono, fontSize: 18, fontWeight: 700, color: 'var(--text-main)' }}>
-              {ps.ranks} <span style={{ fontSize: 10, color: 'var(--text-dim)' }}>Ranks</span>
-            </div>
-          </div>
-        ))}
+      <div style={{
+        background: 'var(--surface)', border: '1px solid var(--border)',
+        borderRadius: 10, height: 250, marginBottom: 24, display: 'flex', alignItems: 'center', justifyContent: 'center'
+      }}>
+        <ResponsiveContainer width="100%" height="100%">
+          <RadarChart cx="50%" cy="50%" outerRadius="70%" data={pillarStats}>
+            <PolarGrid stroke="var(--border)" />
+            <PolarAngleAxis dataKey="subject" tick={{ fill: 'var(--text-main)', fontSize: 11, fontWeight: 700 }} />
+            <Radar name="Ranks" dataKey="value" stroke="#818cf8" fill="#818cf8" fillOpacity={0.4} />
+          </RadarChart>
+        </ResponsiveContainer>
+      </div>
+
+      {/* XP Line Graph */}
+      <div style={{
+        fontSize: 11, fontWeight: 700, letterSpacing: 1.5,
+        color: 'var(--text-dim)', textTransform: 'uppercase', marginBottom: 10,
+      }}>
+        XP History (14 Days)
+      </div>
+      <div style={{
+        background: 'var(--surface)', border: '1px solid var(--border)',
+        borderRadius: 10, height: 200, marginBottom: 24, padding: '16px 16px 16px 0'
+      }}>
+        <ResponsiveContainer width="100%" height="100%">
+          <LineChart data={last14Days}>
+            <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
+            <XAxis dataKey="date" stroke="var(--text-dim)" fontSize={10} tickMargin={10} axisLine={false} tickLine={false} />
+            <Tooltip content={<CustomTooltip />} />
+            <Line type="monotone" dataKey="xp" stroke="#818cf8" strokeWidth={3} dot={{ fill: '#818cf8', r: 3, strokeWidth: 0 }} activeDot={{ r: 5 }} />
+          </LineChart>
+        </ResponsiveContainer>
       </div>
 
       {/* Monthly Retrospective */}
@@ -160,13 +237,31 @@ export default function StatsScreen() {
         fontSize: 11, fontWeight: 700, letterSpacing: 1.5, marginTop: 30,
         color: 'var(--text-dim)', textTransform: 'uppercase', marginBottom: 10,
       }}>
-        Data Management
+        Settings & Data
       </div>
-      <div style={{ display: 'flex', gap: 10, marginBottom: 20 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 20 }}>
+        <button
+          onClick={() => {
+            if ('Notification' in window) {
+              Notification.requestPermission().then(p => {
+                if (p === 'granted') alert('Notifications enabled!');
+              });
+            } else {
+              alert('Notifications not supported in this browser.');
+            }
+          }}
+          style={{
+            fontSize: 12, fontWeight: 600, padding: '10px', borderRadius: 8,
+            border: '1px solid var(--border)', background: 'var(--surface)',
+            color: 'var(--text-main)', cursor: 'pointer', gridColumn: 'span 2'
+          }}
+        >
+          🔔 Enable Daily Reminders
+        </button>
         <button
           onClick={exportGameState}
           style={{
-            flex: 1, fontSize: 12, fontWeight: 600, padding: '10px', borderRadius: 8,
+            fontSize: 12, fontWeight: 600, padding: '10px', borderRadius: 8,
             border: '1px solid var(--border)', background: 'var(--surface)',
             color: 'var(--text-main)', cursor: 'pointer',
           }}
@@ -176,7 +271,7 @@ export default function StatsScreen() {
         <button
           onClick={() => fileInputRef.current?.click()}
           style={{
-            flex: 1, fontSize: 12, fontWeight: 600, padding: '10px', borderRadius: 8,
+            fontSize: 12, fontWeight: 600, padding: '10px', borderRadius: 8,
             border: '1px solid var(--border)', background: 'var(--surface)',
             color: 'var(--text-main)', cursor: 'pointer',
           }}

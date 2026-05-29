@@ -1,17 +1,34 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { GameProvider, useGame } from './context/GameContext';
 import MainScreen from './screens/MainScreen';
 import StoryScreen from './screens/StoryScreen';
 import WorldScreen from './screens/WorldScreen';
 import StatsScreen from './screens/StatsScreen';
+import ShopScreen from './screens/ShopScreen';
 import { xpRequired } from './lib/systems';
 
-const TABS = ['main', 'story', 'world', 'stats'];
+const TABS = ['main', 'story', 'world', 'stats', 'shop'];
 
 function GameApp() {
-  const { phase, startApp, name, level, xp, theme, toggleTheme, toastMsg, levelUpAlert, rankUpAlert } = useGame();
+  const { phase, startApp, name, level, xp, hp, gold, energy, theme, toggleTheme, toastMsg, levelUpAlert, rankUpAlert } = useGame();
   const [tab, setTab] = useState('main');
   const [inputName, setInputName] = useState('');
+
+  useEffect(() => {
+    const id = setInterval(() => {
+      const now = new Date();
+      // Remind at 8:00 PM if energy is left
+      if (now.getHours() === 20 && now.getMinutes() === 0 && energy > 20) {
+        if ('Notification' in window && Notification.permission === 'granted') {
+          new Notification("Energy Remaining!", {
+            body: `You still have ${energy} energy left today. Go do some quests!`,
+            icon: '/favicon.ico'
+          });
+        }
+      }
+    }, 60000); // check every minute
+    return () => clearInterval(id);
+  }, [energy]);
 
   if (phase === 'loading') {
     return (
@@ -83,6 +100,13 @@ function GameApp() {
             <div style={{ fontFamily: 'var(--mono)', fontSize: '11px', color: 'var(--text-muted)' }}>
               Lv {level}
             </div>
+            <div style={{ flex: 1 }} />
+            <div style={{ fontFamily: 'var(--mono)', fontSize: '11px', color: '#ef4444', fontWeight: 700 }}>
+              ❤️ {hp}/100
+            </div>
+            <div style={{ fontFamily: 'var(--mono)', fontSize: '11px', color: '#eab308', fontWeight: 700 }}>
+              💰 {gold}
+            </div>
           </div>
           {/* XP Progress Bar */}
           <div style={{ height: 4, background: 'var(--border)', borderRadius: 2, overflow: 'hidden', marginTop: 4 }}>
@@ -100,7 +124,7 @@ function GameApp() {
           style={{
             background: 'var(--surface)', border: '1px solid var(--border)',
             borderRadius: 8, width: 36, height: 36, display: 'grid', placeItems: 'center',
-            cursor: 'pointer', fontSize: 16, color: 'var(--text-muted)', flexShrink: 0
+            cursor: 'pointer', fontSize: 16, color: 'var(--text-muted)', flexShrink: 0, marginLeft: 8
           }}
           title="Toggle Theme"
         >
@@ -136,6 +160,7 @@ function GameApp() {
       {tab === 'story' && <StoryScreen />}
       {tab === 'world' && <WorldScreen />}
       {tab === 'stats' && <StatsScreen />}
+      {tab === 'shop' && <ShopScreen />}
 
       {/* Toast */}
       <div className={'toast' + (toastMsg ? ' show' : '')}>{toastMsg}</div>

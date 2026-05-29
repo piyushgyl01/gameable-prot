@@ -15,7 +15,7 @@ export const MAIN_QUESTS = [
       { id: 'ir8', t: 1, ic: '🧘', nm: 'Stretch', ds: 'Prevent injury.', en: 10, xp: 20, df: 1 },
       { id: 'ir5', t: 2, ic: '🔥', nm: 'Failure set', ds: 'Absolute.', en: 20, xp: 65, df: 2 },
       { id: 'ir6', t: 2, ic: '🏃', nm: 'Cardio', ds: '20min.', en: 18, xp: 50, df: 2 },
-      { id: 'ir7', t: 3, ic: '⚡', nm: 'PR attempt', ds: 'Record.', en: 40, xp: 140, df: 3 },
+      { id: 'ir7', t: 3, ic: '⚡', nm: 'PR attempt', ds: 'Record.', en: 40, xp: 140, df: 3, req: { mq: 'iron', r: 2 } },
     ],
   },
   {
@@ -26,7 +26,7 @@ export const MAIN_QUESTS = [
       { id: 'bk3', t: 1, ic: '🛌', nm: 'Bed <12', ds: 'Sleep.', en: 10, xp: 35, df: 2 },
       { id: 'bk4', t: 2, ic: '📊', nm: 'Track macros', ds: 'All.', en: 12, xp: 40, df: 2 },
       { id: 'bk5', t: 2, ic: '💊', nm: 'Supplements', ds: 'Daily.', en: 3, xp: 10, df: 1 },
-      { id: 'bk6', t: 3, ic: '🍱', nm: 'Meal prep', ds: '3+ days.', en: 30, xp: 90, df: 3 },
+      { id: 'bk6', t: 3, ic: '🍱', nm: 'Meal prep', ds: '3+ days.', en: 30, xp: 90, df: 3, req: { mq: 'bulk', r: 2 } },
     ],
   },
   {
@@ -37,7 +37,7 @@ export const MAIN_QUESTS = [
       { id: 'ds3', t: 1, ic: '📖', nm: 'Review', ds: 'Optimize.', en: 10, xp: 30, df: 1 },
       { id: 'ds4', t: 2, ic: '🔥', nm: 'LC Hard', ds: 'Try.', en: 35, xp: 120, df: 3 },
       { id: 'ds5', t: 2, ic: '📝', nm: 'Pattern', ds: 'Deep.', en: 22, xp: 65, df: 2 },
-      { id: 'ds6', t: 3, ic: '🏗️', nm: 'From scratch', ds: 'No refs.', en: 30, xp: 100, df: 3 },
+      { id: 'ds6', t: 3, ic: '🏗️', nm: 'From scratch', ds: 'No refs.', en: 30, xp: 100, df: 3, req: { mq: 'dsa', r: 3 } },
     ],
   },
   {
@@ -48,7 +48,7 @@ export const MAIN_QUESTS = [
       { id: 'fs3', t: 1, ic: '🐛', nm: 'Fix bug', ds: 'Root.', en: 20, xp: 60, df: 2 },
       { id: 'fs4', t: 2, ic: '🎨', nm: 'Polish UI', ds: 'Details.', en: 20, xp: 55, df: 2 },
       { id: 'fs5', t: 2, ic: '🔌', nm: 'API', ds: 'Typed.', en: 30, xp: 90, df: 3 },
-      { id: 'fs6', t: 3, ic: '🧪', nm: 'Read OSS', ds: 'Learn.', en: 15, xp: 45, df: 1 },
+      { id: 'fs6', t: 3, ic: '🧪', nm: 'Read OSS', ds: 'Learn.', en: 15, xp: 45, df: 1, req: { mq: 'stack', r: 2 } },
     ],
   },
   {
@@ -58,7 +58,7 @@ export const MAIN_QUESTS = [
       { id: 'ai2', t: 1, ic: '🎯', nm: 'Try tool', ds: 'Eval.', en: 15, xp: 40, df: 1 },
       { id: 'ai3', t: 2, ic: '🔧', nm: 'Build API', ds: 'Real.', en: 30, xp: 90, df: 3 },
       { id: 'ai4', t: 2, ic: '💡', nm: 'Study ML', ds: '1 concept.', en: 22, xp: 65, df: 2 },
-      { id: 'ai5', t: 3, ic: '🐍', nm: 'ML script', ds: 'Applied.', en: 28, xp: 85, df: 3 },
+      { id: 'ai5', t: 3, ic: '🐍', nm: 'ML script', ds: 'Applied.', en: 28, xp: 85, df: 3, req: { mq: 'ai', r: 2 } },
     ],
   },
   {

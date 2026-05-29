@@ -7,6 +7,8 @@ import {
   MAX_ENERGY, stringHash, seededShuffle, getRankLabel
 } from '../lib/systems';
 
+import { fetchCloudSave, pushCloudSave } from '../lib/api';
+
 const GameContext = createContext(null);
 
 export function useGame() {
@@ -20,7 +22,14 @@ function buildDailyPool(mast, cust, day) {
   MAIN_QUESTS.forEach((mq) => {
     const rk = getRankIndex(mast[mq.id] || 0);
     const maxTier = rk >= 4 ? 3 : rk >= 2 ? 2 : 1;
-    let pool = mq.subs.filter((s) => s.t <= maxTier);
+    let pool = mq.subs.filter((s) => {
+      if (s.t > maxTier) return false;
+      if (s.req) {
+        const reqRank = getRankIndex(mast[s.req.mq] || 0);
+        if (reqRank < s.req.r) return false;
+      }
+      return true;
+    });
     if (cust[mq.id]) {
       pool = pool.concat(cust[mq.id].map((c) => ({ ...c, t: 1 })));
     }
@@ -45,6 +54,8 @@ export function GameProvider({ children }) {
   const [level, setLevel] = useState(1);
   const [energy, setEnergy] = useState(MAX_ENERGY);
   const [theme, setTheme] = useState('dark');
+  const [hp, setHp] = useState(100);
+  const [gold, setGold] = useState(0);
 
   // Progress
   const [mastery, setMastery] = useState({});
@@ -64,12 +75,13 @@ export function GameProvider({ children }) {
   const [customQuests, setCustomQuests] = useState({});
   const [storyQuests, setStoryQuests] = useState(INITIAL_STORY_QUESTS);
   const [worldQuests, setWorldQuests] = useState(INITIAL_WORLD_QUESTS);
+  const [rewards, setRewards] = useState([]);
 
   // UI transient
   const [toastMsg, setToastMsg] = useState(null);
   const [levelUpAlert, setLevelUpAlert] = useState(null);
   const [rankUpAlert, setRankUpAlert] = useState(null);
-  const [floatingXp, setFloatingXp] = useState(null); // { id, amount }
+  const [floatingXp, setFloatingXp] = useState(null);
 
   const addToLog = useCallback((msg) => {
     setActivityLog(prev => [{ time: Date.now(), msg }, ...prev].slice(0, 100));
@@ -81,6 +93,8 @@ export function GameProvider({ children }) {
     setLevel(data.level || 1);
     setEnergy(data.energy != null ? data.energy : MAX_ENERGY);
     setTheme(data.theme || 'dark');
+    setHp(data.hp != null ? data.hp : 100);
+    setGold(data.gold || 0);
     setMastery(data.mastery || {});
     setStreaks(data.streaks || {});
     setHistory(data.history || {});
@@ -88,10 +102,29 @@ export function GameProvider({ children }) {
     setCustomQuests(data.customQuests || {});
     setStoryQuests(data.storyQuests || INITIAL_STORY_QUESTS);
     setWorldQuests(data.worldQuests || INITIAL_WORLD_QUESTS);
+    setRewards(data.rewards || []);
     setActivityLog(data.activityLog || []);
 
     const today = getTodayString();
     if (data.gameDate !== today) {
+      // Process new day penalties
+      let penalty = 0;
+      if (data.questStates) {
+        Object.values(data.questStates).forEach(qs => {
+          if (qs.s === 'active') penalty += 10;
+        });
+      }
+      if (penalty > 0) {
+        setHp((prev) => {
+          const newHp = prev - penalty;
+          if (newHp <= 0) {
+            setLevel(l => Math.max(1, l - 1));
+            return 100;
+          }
+          return newHp;
+        });
+      }
+
       setEnergy(MAX_ENERGY);
       setQuestStates({});
       setDailyXp(0);
@@ -108,29 +141,30 @@ export function GameProvider({ children }) {
   }, []);
 
   useEffect(() => {
-    const data = loadGameState();
-    if (data && data.name) {
-      loadFromData(data);
-      setPhase('play');
-    } else {
-      setPhase('enter');
-    }
+    fetchCloudSave().then(data => {
+      if (data && data.name) {
+        loadFromData(data);
+        setPhase('play');
+      } else {
+        setPhase('enter');
+      }
+    });
   }, [loadFromData]);
 
   useEffect(() => {
     if (phase !== 'play') return;
     const id = setTimeout(() => {
-      saveGameState({
-        name, xp, level, energy, theme, mastery, streaks, history, totalXp,
+      pushCloudSave({
+        name, xp, level, energy, theme, hp, gold, mastery, streaks, history, totalXp,
         gameDate, dailyXp, chainBonus, activityLog, customQuests, storyQuests,
-        worldQuests, dailyPool, questStates,
+        worldQuests, rewards, dailyPool, questStates,
       });
-    }, 400);
+    }, 600);
     return () => clearTimeout(id);
   }, [
-    phase, name, xp, level, energy, theme, mastery, streaks, history, totalXp,
+    phase, name, xp, level, energy, theme, hp, gold, mastery, streaks, history, totalXp,
     gameDate, dailyXp, chainBonus, activityLog, customQuests, storyQuests,
-    worldQuests, dailyPool, questStates
+    worldQuests, rewards, dailyPool, questStates
   ]);
 
   useEffect(() => {
@@ -146,6 +180,21 @@ export function GameProvider({ children }) {
     const earned = Math.round(amount * xpMultiplier(level));
     setTotalXp((p) => p + earned);
     setDailyXp((p) => p + earned);
+    setGold((p) => p + Math.round(earned / 2));
+    
+    const today = getTodayString();
+    setHistory(prev => {
+      const todayData = prev[today] || { count: 0, xp: 0 };
+      // Fallback for old history data shape
+      if (typeof todayData === 'number') {
+        return { ...prev, [today]: { count: todayData + (sourceId ? 1 : 0), xp: earned } };
+      }
+      return { ...prev, [today]: { 
+        count: (todayData.count || 0) + (sourceId ? 1 : 0), 
+        xp: (todayData.xp || 0) + earned 
+      }};
+    });
+
     if (sourceId) {
       setFloatingXp({ id: sourceId, amount: earned });
       setTimeout(() => setFloatingXp(null), 1200);
@@ -178,6 +227,26 @@ export function GameProvider({ children }) {
   }
 
   function doNewDay() {
+    let penalty = 0;
+    Object.values(questStates).forEach(qs => {
+      if (qs.s === 'active') penalty += 10;
+    });
+    
+    if (penalty > 0) {
+      setHp(prev => {
+        const newHp = prev - penalty;
+        if (newHp <= 0) {
+          setLevel(l => Math.max(1, l - 1));
+          showToast('HP hit 0. Lost 1 Level.');
+          return 100;
+        }
+        showToast(`Missed quests! Lost ${penalty} HP.`);
+        return newHp;
+      });
+    } else {
+      showToast('New day started');
+    }
+
     const today = getTodayString();
     setGameDate(today);
     setEnergy(MAX_ENERGY);
@@ -185,7 +254,6 @@ export function GameProvider({ children }) {
     setDailyXp(0);
     setChainBonus({ pillar: null, count: 0 });
     setDailyPool(buildDailyPool(mastery, customQuests, today));
-    showToast('New day started');
     addToLog('Started a new day');
   }
 
@@ -202,7 +270,11 @@ export function GameProvider({ children }) {
     if (!mq) return;
     const rk = getRankIndex(mastery[mq.id] || 0);
     const maxTier = rk >= 4 ? 3 : rk >= 2 ? 2 : 1;
-    let pool = mq.subs.filter((s) => s.t <= maxTier);
+    let pool = mq.subs.filter((s) => {
+      if (s.t > maxTier) return false;
+      if (s.req && getRankIndex(mastery[s.req.mq] || 0) < s.req.r) return false;
+      return true;
+    });
     if (customQuests[mq.id]) pool = pool.concat(customQuests[mq.id].map((c) => ({ ...c, t: 1 })));
     const currentIds = dailyPool.filter((d) => d.mqId === q.mqId).map((d) => d.id);
     const available = pool.filter((s) => !currentIds.includes(s.id));
@@ -243,7 +315,6 @@ export function GameProvider({ children }) {
       if (old.d === today) nc = old.c;
       return { ...prev, [q.mqId]: { c: nc, d: today } };
     });
-    setHistory((prev) => ({ ...prev, [today]: (prev[today] || 0) + 1 }));
 
     // Mastery & Rank up
     let rankUp = false;
@@ -300,9 +371,9 @@ export function GameProvider({ children }) {
     clearGameState();
     setPhase('enter');
     setName(''); setXp(0); setLevel(1); setEnergy(MAX_ENERGY);
-    setTheme('dark'); setMastery({}); setStreaks({}); setHistory({});
+    setTheme('dark'); setHp(100); setGold(0); setMastery({}); setStreaks({}); setHistory({});
     setTotalXp(0); setDailyXp(0); setChainBonus({ pillar: null, count: 0 });
-    setActivityLog([]); setCustomQuests({});
+    setActivityLog([]); setCustomQuests({}); setRewards([]);
     setStoryQuests(INITIAL_STORY_QUESTS); setWorldQuests(INITIAL_WORLD_QUESTS);
     setQuestStates({});
   }
@@ -324,13 +395,13 @@ export function GameProvider({ children }) {
   return (
     <GameContext.Provider value={{
       phase, startApp, resetGame, triggerImport,
-      name, xp, level, energy, theme, toggleTheme,
+      name, xp, level, energy, theme, toggleTheme, hp, setHp, gold, setGold,
       mastery, streaks, history, totalXp, dailyXp, chainBonus, activityLog,
-      customQuests, setCustomQuests,
+      customQuests, setCustomQuests, rewards, setRewards,
       storyQuests, setStoryQuests, toggleStoryTask,
       worldQuests, setWorldQuests, toggleWorldTask,
       dailyPool, questStates, startQuest, skipQuest, completeQuest, doNewDay,
-      toastMsg, levelUpAlert, rankUpAlert, floatingXp
+      toastMsg, showToast, levelUpAlert, rankUpAlert, floatingXp
     }}>
       {children}
     </GameContext.Provider>

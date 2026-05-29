@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { formatEnergyTime, xpMultiplier } from '../lib/systems';
 import { useGame } from '../context/GameContext';
+import { useSwipeable } from 'react-swipeable';
 
 const DF_COL = { 1: '#10b981', 2: '#eab308', 3: '#ef4444' };
 const DF_LBL = { 1: 'Easy', 2: 'Med', 3: 'Hard' };
@@ -14,6 +15,28 @@ export default function QuestCard({ quest, questState, currentLevel, onStart, on
   const dc = DF_COL[q.df] || '#818cf8';
   const earnedXp = Math.round(q.xp * xpMultiplier(currentLevel));
 
+  const [swipeOffset, setSwipeOffset] = useState(0);
+
+  const handlers = useSwipeable({
+    onSwiping: (e) => {
+      if (status !== 'idle' && status !== 'active') return;
+      if (e.dir === 'Left' || e.dir === 'Right') {
+        setSwipeOffset(e.deltaX);
+      }
+    },
+    onSwipedLeft: () => {
+      setSwipeOffset(0);
+      if (status === 'idle') onSkip(q);
+    },
+    onSwipedRight: () => {
+      setSwipeOffset(0);
+      if (status === 'active') onComplete(q);
+      else if (status === 'idle') onStart(q);
+    },
+    onSwiped: () => setSwipeOffset(0),
+    trackMouse: true,
+  });
+
   const chip = (bg) => ({
     display: 'inline-flex', alignItems: 'center', gap: 4,
     padding: '2px 8px', borderRadius: 6, fontSize: 11, fontWeight: 600,
@@ -21,12 +44,13 @@ export default function QuestCard({ quest, questState, currentLevel, onStart, on
   });
 
   return (
-    <div style={{
+    <div {...handlers} style={{
       display: 'flex', gap: 12, padding: '12px 14px',
       borderTop: '1px solid var(--border)', opacity: isDone ? 0.3 : 1,
       background: isActive ? 'rgba(234,179,8,0.04)' : 'transparent',
       borderLeft: isActive ? '2px solid #eab308' : '2px solid transparent',
-      transition: 'all 0.2s ease',
+      transition: swipeOffset === 0 ? 'all 0.2s ease' : 'none',
+      transform: `translateX(${swipeOffset}px)`,
     }}>
       {/* Icon */}
       <div style={{ fontSize: 20, lineHeight: '24px', flexShrink: 0, paddingTop: 2 }}>
