@@ -1,130 +1,109 @@
 import React from 'react';
 import { formatEnergyTime, xpMultiplier } from '../lib/systems';
-import { DIFFICULTY_COLORS, DIFFICULTY_LABELS } from '../lib/quests';
 
-export default function QuestCard({ quest, stateObj, onStart, onSkip, onComplete, currentLevel }) {
-  const status = stateObj?.s || "idle";
-  const isDone = status === "done";
-  const isActive = status === "active";
-  
-  const earnedXp = Math.round(quest.xp * xpMultiplier(currentLevel));
-  const diffColor = DIFFICULTY_COLORS[quest.df];
-  
+const DF_COL = { 1: '#10b981', 2: '#eab308', 3: '#ef4444' };
+const DF_LBL = { 1: 'Easy', 2: 'Med', 3: 'Hard' };
+
+export default function QuestCard({ quest, questState, currentLevel, onStart, onSkip, onComplete }) {
+  const q = quest;
+  const status = questState?.s || 'idle';
+  const isDone = status === 'done';
+  const isActive = status === 'active';
+  const dc = DF_COL[q.df] || '#818cf8';
+  const earnedXp = Math.round(q.xp * xpMultiplier(currentLevel));
+
+  const chip = (bg) => ({
+    display: 'inline-flex', alignItems: 'center', gap: 4,
+    padding: '2px 8px', borderRadius: 6, fontSize: 11, fontWeight: 600,
+    background: bg, marginRight: 6, marginTop: 6,
+  });
+
   return (
     <div style={{
-      display: 'flex',
-      alignItems: 'flex-start',
-      gap: '12px',
-      padding: '12px 14px',
-      borderTop: '1px solid var(--border)',
-      background: isActive ? 'rgba(234, 179, 8, 0.04)' : 'transparent',
+      display: 'flex', gap: 12, padding: '12px 14px',
+      borderTop: '1px solid var(--border)', opacity: isDone ? 0.3 : 1,
+      background: isActive ? 'rgba(234,179,8,0.04)' : 'transparent',
       borderLeft: isActive ? '2px solid #eab308' : '2px solid transparent',
-      opacity: isDone ? 0.3 : 1,
       transition: 'all 0.2s ease',
-      position: 'relative'
     }}>
-      {/* Difficulty indicator line */}
-      <div style={{
-        position: 'absolute',
-        left: 0, top: 0, bottom: 0, width: '2px',
-        background: isActive ? 'transparent' : diffColor,
-        opacity: isDone ? 0.1 : 0.6
-      }} />
-
-      <div style={{ fontSize: '20px', width: '24px', textAlign: 'center', flexShrink: 0 }}>
-        {quest.ic}
+      {/* Icon */}
+      <div style={{ fontSize: 20, lineHeight: '24px', flexShrink: 0, paddingTop: 2 }}>
+        {q.ic}
       </div>
 
-      <div style={{ flex: 1 }}>
-        <div style={{ 
-          fontSize: '14px', 
-          fontWeight: '700', 
-          marginBottom: '2px',
-          textDecoration: isDone ? 'line-through' : 'none'
+      {/* Middle */}
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{
+          fontSize: 14, fontWeight: 700, color: 'var(--text-main)',
+          textDecoration: isDone ? 'line-through' : 'none',
         }}>
-          {quest.nm}
+          {q.nm}
         </div>
-        <div style={{ fontSize: '13px', color: 'var(--text-muted)', marginBottom: '6px' }}>
-          {quest.ds}
-        </div>
-        
-        <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-          <span style={{
-            fontSize: '10px',
-            fontWeight: '600',
-            padding: '2px 6px',
-            borderRadius: '4px',
-            color: diffColor,
-            background: `${diffColor}15`
-          }}>
-            {DIFFICULTY_LABELS[quest.df]}
+        {q.ds && (
+          <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 2 }}>{q.ds}</div>
+        )}
+        <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center' }}>
+          <span style={chip(dc + '1a')}>
+            <span style={{ color: dc }}>{DF_LBL[q.df] || 'Med'}</span>
           </span>
-          
           {isActive && (
-            <span style={{
-              fontSize: '10px',
-              fontWeight: '600',
-              padding: '2px 6px',
-              borderRadius: '4px',
-              color: '#eab308',
-              background: 'rgba(234, 179, 8, 0.1)'
-            }}>
-              ⚡ {stateObj.en} • {formatEnergyTime(stateObj.en)}
+            <span style={chip('rgba(234,179,8,0.1)')}>
+              <span style={{ color: '#eab308' }}>⚡ {q.en} • {formatEnergyTime(q.en)}</span>
             </span>
           )}
-          
           {isDone && (
-            <span style={{
-              fontSize: '10px',
-              fontWeight: '700',
-              padding: '2px 6px',
-              borderRadius: '4px',
-              color: '#10b981',
-              background: 'rgba(16, 185, 129, 0.1)'
-            }}>
-              ✓ Completed
+            <span style={chip('rgba(16,185,129,0.1)')}>
+              <span style={{ color: '#10b981' }}>✓ Completed</span>
             </span>
           )}
         </div>
       </div>
 
-      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '6px', flexShrink: 0 }}>
-        <span className="mono font-semibold text-xs text-muted">+{earnedXp} XP</span>
-        
-        {status === "idle" && (
-          <div style={{ display: 'flex', gap: '6px' }}>
-            <button className="btn-ghost" onClick={() => onSkip(quest)}>Skip</button>
-            <button 
+      {/* Right */}
+      <div style={{
+        display: 'flex', flexDirection: 'column', alignItems: 'flex-end',
+        justifyContent: 'flex-end', gap: 6, flexShrink: 0,
+      }}>
+        <span style={{
+          fontFamily: "'JetBrains Mono', monospace", fontSize: 13,
+          fontWeight: 700, color: 'var(--text-dim)',
+        }}>
+          +{earnedXp} xp
+        </span>
+
+        {status === 'idle' && (
+          <div style={{ display: 'flex', gap: 6 }}>
+            <button
+              onClick={() => onSkip(q)}
               style={{
-                background: 'var(--surface)',
-                border: '1px solid var(--border-focus)',
-                padding: '6px 10px',
-                borderRadius: '6px',
-                fontSize: '12px',
-                fontWeight: '600',
-                color: 'var(--text-main)',
-                cursor: 'pointer'
+                fontSize: 12, padding: '4px 10px', borderRadius: 6,
+                background: 'transparent', border: '1px solid var(--border)',
+                color: 'var(--text-dim)', cursor: 'pointer',
               }}
-              onClick={() => onStart(quest)}
             >
-              {formatEnergyTime(quest.en)}
+              Skip
+            </button>
+            <button
+              onClick={() => onStart(q)}
+              style={{
+                fontSize: 12, padding: '4px 10px', borderRadius: 6,
+                background: 'rgba(234,179,8,0.12)', border: '1px solid rgba(234,179,8,0.3)',
+                color: '#eab308', fontWeight: 600, cursor: 'pointer',
+              }}
+            >
+              {formatEnergyTime(q.en)}
             </button>
           </div>
         )}
-        
+
         {isActive && (
-          <button 
+          <button
+            onClick={() => onComplete(q)}
             style={{
-              background: '#16a34a',
-              border: 'none',
-              padding: '6px 14px',
-              borderRadius: '6px',
-              fontSize: '12px',
-              fontWeight: '700',
-              color: '#fff',
-              cursor: 'pointer'
+              fontSize: 12, padding: '4px 14px', borderRadius: 6,
+              background: '#16a34a', border: 'none',
+              color: '#fff', fontWeight: 600, cursor: 'pointer',
             }}
-            onClick={() => onComplete(quest)}
           >
             Done
           </button>

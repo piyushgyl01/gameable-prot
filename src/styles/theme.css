@@ -6,109 +6,25 @@
   --surface-hover: #27272a;
   --border: #27272a;
   --border-focus: #3f3f46;
-  
   --text-main: #f4f4f5;
   --text-muted: #a1a1aa;
   --text-dim: #52525b;
-
-  --accent-vitality: #10b981;
-  --accent-mastery: #818cf8;
-  --accent-bonds: #f59e0b;
-  
-  --diff-easy: #10b981;
-  --diff-med: #eab308;
-  --diff-hard: #ef4444;
-
   --radius: 8px;
-  --font-sans: 'Inter', sans-serif;
-  --font-mono: 'JetBrains Mono', monospace;
+  --font: 'Inter', system-ui, sans-serif;
+  --mono: 'JetBrains Mono', monospace;
 }
 
-*, *::before, *::after {
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
-}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 body {
   background: var(--bg);
   color: var(--text-main);
-  font-family: var(--font-sans);
+  font-family: var(--font);
   -webkit-font-smoothing: antialiased;
   line-height: 1.5;
 }
 
-/* Typography utilities */
-.mono { font-family: var(--font-mono); }
-.text-sm { font-size: 13px; }
-.text-xs { font-size: 11px; }
-.text-muted { color: var(--text-muted); }
-.font-bold { font-weight: 700; }
-.font-semibold { font-weight: 600; }
-
-/* Layout */
-.app-container {
-  max-width: 680px;
-  margin: 0 auto;
-  padding: 24px 16px 120px;
-}
-
-/* Buttons */
-button {
-  background: none;
-  border: none;
-  font-family: inherit;
-  cursor: pointer;
-  color: inherit;
-  transition: all 0.2s ease;
-}
-
-.btn-primary {
-  background: var(--surface-hover);
-  border: 1px solid var(--border-focus);
-  padding: 8px 16px;
-  border-radius: 6px;
-  font-weight: 600;
-  color: var(--text-main);
-}
-
-.btn-primary:hover {
-  background: var(--border-focus);
-}
-
-.btn-ghost {
-  padding: 6px 12px;
-  border-radius: 6px;
-  color: var(--text-muted);
-  font-weight: 500;
-  font-size: 13px;
-}
-
-.btn-ghost:hover {
-  color: var(--text-main);
-  background: var(--surface);
-}
-
-/* Inputs */
-.input-base {
-  width: 100%;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  padding: 10px 14px;
-  color: var(--text-main);
-  font-family: var(--font-sans);
-  font-size: 14px;
-  outline: none;
-}
-.input-base:focus {
-  border-color: var(--accent-mastery);
-}
-.input-base::placeholder {
-  color: var(--text-dim);
-}
-
-/* Toasts & Modals */
+/* ── Toast ─────────────────────────────────────────── */
 .toast {
   position: fixed;
   bottom: 24px;
@@ -116,62 +32,58 @@ button {
   transform: translateX(-50%) translateY(10px);
   background: var(--surface-hover);
   border: 1px solid var(--border-focus);
-  padding: 10px 20px;
+  padding: 10px 24px;
   border-radius: 8px;
   font-weight: 600;
   font-size: 13px;
   opacity: 0;
   pointer-events: none;
-  transition: all 0.3s ease;
+  transition: all 0.25s ease;
   z-index: 100;
+  white-space: nowrap;
 }
 .toast.show {
   opacity: 1;
   transform: translateX(-50%) translateY(0);
 }
 
-/* Level Up Overlay */
+/* ── Level-Up Overlay ──────────────────────────────── */
 .level-up-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.8);
+  background: rgba(0, 0, 0, 0.85);
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 200;
   animation: fadeInOut 3s ease forwards;
 }
-
-.level-up-text {
-  text-align: center;
-  transform: scale(0.8);
-  animation: popIn 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-}
-
 .level-up-number {
   font-size: 80px;
   font-weight: 800;
-  color: var(--accent-mastery);
-  text-shadow: 0 0 40px rgba(129, 140, 248, 0.4);
+  font-family: var(--mono);
+  color: #818cf8;
+  text-shadow: 0 0 60px rgba(129, 140, 248, 0.5);
+  text-align: center;
+  animation: popIn 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
-
 .level-up-label {
-  font-size: 14px;
+  font-size: 12px;
   text-transform: uppercase;
   letter-spacing: 4px;
   color: var(--text-muted);
   font-weight: 700;
   margin-top: 8px;
+  text-align: center;
 }
 
 @keyframes fadeInOut {
   0% { opacity: 0; }
   10% { opacity: 1; }
   80% { opacity: 1; }
-  100% { opacity: 0; }
+  100% { opacity: 0; pointer-events: none; }
 }
-
 @keyframes popIn {
-  0% { transform: scale(0.8); opacity: 0; }
+  0% { transform: scale(0.6); opacity: 0; }
   100% { transform: scale(1); opacity: 1; }
 }

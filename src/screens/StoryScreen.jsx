@@ -3,120 +3,223 @@ import { useGame } from '../context/GameContext';
 import { xpMultiplier } from '../lib/systems';
 
 export default function StoryScreen() {
-  const { storyQuests, setStoryQuests, toggleStoryTask, level } = useGame();
-  
   const [showAdd, setShowAdd] = useState(false);
-  const [newTitle, setNewTitle] = useState("");
-  const [newDesc, setNewDesc] = useState("");
-  const [newTimeline, setNewTimeline] = useState("");
+  const [newTitle, setNewTitle] = useState('');
+  const [newDesc, setNewDesc] = useState('');
+  const [newTimeline, setNewTimeline] = useState('');
+
+  const { storyQuests, setStoryQuests, toggleStoryTask, level } = useGame();
+
+  const mono = { fontFamily: "'JetBrains Mono', monospace" };
 
   const handleAddChapter = () => {
     if (!newTitle.trim()) return;
-    setStoryQuests(prev => [...prev, {
-      id: `s_${Date.now()}`,
-      ic: "📌",
+    setStoryQuests((prev) => [...prev, {
+      id: 's_' + Date.now(),
+      ic: '📖',
       nm: newTitle.trim(),
-      ds: newDesc.trim() || "Chapter.",
-      tm: newTimeline.trim() || "TBD",
+      ds: newDesc.trim(),
+      tm: newTimeline.trim() || 'TBD',
       xp: 50,
-      tasks: []
+      tasks: [],
     }]);
+    setNewTitle('');
+    setNewDesc('');
+    setNewTimeline('');
     setShowAdd(false);
-    setNewTitle("");
-    setNewDesc("");
-    setNewTimeline("");
   };
 
   const handleAddTask = (chapterId) => {
-    const tx = prompt("Task name:");
-    if (!tx) return;
-    setStoryQuests(prev => prev.map(ch => {
-      if (ch.id === chapterId) {
-        return { ...ch, tasks: [...ch.tasks, { id: `st_${Date.now()}`, tx: tx.trim(), dn: false }] };
-      }
-      return ch;
-    }));
+    const name = prompt('Task name:');
+    if (!name?.trim()) return;
+    setStoryQuests((prev) =>
+      prev.map((ch) =>
+        ch.id === chapterId
+          ? { ...ch, tasks: [...ch.tasks, { id: 'st_' + Date.now(), tx: name.trim(), dn: false }] }
+          : ch
+      )
+    );
   };
 
   return (
     <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <span style={{ fontSize: '14px', fontWeight: '800', letterSpacing: '1px', textTransform: 'uppercase', color: 'var(--text-muted)' }}>Story</span>
-          <span style={{ fontSize: '10px', fontWeight: '600', padding: '2px 8px', borderRadius: '4px', border: '1px solid rgba(96, 165, 250, 0.2)', color: '#60a5fa', background: 'rgba(96, 165, 250, 0.08)' }}>Chapters</span>
-        </div>
-        <button className="btn-ghost" onClick={() => setShowAdd(!showAdd)}>
-          {showAdd ? "Cancel" : "+ New Chapter"}
+      {/* Header */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
+        <span style={{
+          fontSize: 11, fontWeight: 700, letterSpacing: 1.5,
+          color: 'var(--text-dim)', textTransform: 'uppercase',
+        }}>
+          Story
+        </span>
+        <span style={{
+          fontSize: 10, fontWeight: 600, padding: '2px 8px', borderRadius: 6,
+          background: 'rgba(129,140,248,0.1)', color: '#818cf8',
+        }}>
+          Chapters
+        </span>
+        <div style={{ flex: 1 }} />
+        <button
+          onClick={() => setShowAdd(!showAdd)}
+          style={{
+            fontSize: 12, fontWeight: 600, padding: '5px 12px', borderRadius: 8,
+            border: '1px solid var(--border)', background: 'transparent',
+            color: 'var(--text-dim)', cursor: 'pointer',
+          }}
+        >
+          {showAdd ? 'Cancel' : '+ New Chapter'}
         </button>
       </div>
 
+      {/* Add form */}
       {showAdd && (
-        <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: '16px', marginBottom: '12px' }}>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-            <input className="input-base" placeholder="Chapter Name" value={newTitle} onChange={e => setNewTitle(e.target.value)} autoFocus />
-            <input className="input-base" placeholder="Description" value={newDesc} onChange={e => setNewDesc(e.target.value)} />
-            <input className="input-base" placeholder="Timeline (e.g. 2025+)" value={newTimeline} onChange={e => setNewTimeline(e.target.value)} />
-            <button className="btn-primary" style={{ marginTop: '4px' }} onClick={handleAddChapter}>Create Chapter</button>
-          </div>
+        <div style={{
+          background: 'var(--surface)', border: '1px solid var(--border)',
+          borderRadius: 10, padding: 14, marginBottom: 12,
+          display: 'flex', flexDirection: 'column', gap: 8,
+        }}>
+          <input
+            value={newTitle} onChange={(e) => setNewTitle(e.target.value)}
+            placeholder="Chapter title" autoFocus
+            style={{
+              fontSize: 13, padding: '6px 10px', borderRadius: 6,
+              border: '1px solid var(--border)', background: 'var(--bg)',
+              color: 'var(--text-main)', outline: 'none', fontFamily: 'var(--font)',
+            }}
+          />
+          <input
+            value={newDesc} onChange={(e) => setNewDesc(e.target.value)}
+            placeholder="Description"
+            style={{
+              fontSize: 13, padding: '6px 10px', borderRadius: 6,
+              border: '1px solid var(--border)', background: 'var(--bg)',
+              color: 'var(--text-main)', outline: 'none', fontFamily: 'var(--font)',
+            }}
+          />
+          <input
+            value={newTimeline} onChange={(e) => setNewTimeline(e.target.value)}
+            placeholder="Timeline (e.g. Jan-May 26)"
+            style={{
+              fontSize: 13, padding: '6px 10px', borderRadius: 6,
+              border: '1px solid var(--border)', background: 'var(--bg)',
+              color: 'var(--text-main)', outline: 'none', fontFamily: 'var(--font)',
+            }}
+          />
+          <button
+            onClick={handleAddChapter}
+            style={{
+              fontSize: 12, fontWeight: 600, padding: '6px 14px', borderRadius: 8,
+              background: 'rgba(129,140,248,0.12)', border: '1px solid rgba(129,140,248,0.3)',
+              color: '#818cf8', cursor: 'pointer', alignSelf: 'flex-start',
+            }}
+          >
+            Create
+          </button>
         </div>
       )}
 
-      <div>
-        {storyQuests.map(sq => {
-          const done = sq.tasks.filter(t => t.dn).length;
-          const pct = sq.tasks.length ? Math.round((done / sq.tasks.length) * 100) : 0;
-          const xpEarned = Math.round(sq.xp * xpMultiplier(level));
-          
-          return (
-            <div key={sq.id} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: '16px', marginBottom: '12px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
-                <span style={{ fontSize: '24px' }}>{sq.ic}</span>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: '16px', fontWeight: '800' }}>{sq.nm}</div>
-                  <div className="mono text-xs text-muted">{sq.tm}</div>
-                </div>
+      {/* Chapters */}
+      {storyQuests.map((ch) => {
+        const done = ch.tasks.filter((t) => t.dn).length;
+        const total = ch.tasks.length;
+        const progress = total > 0 ? (done / total) * 100 : 0;
+        const xpEarned = Math.round(ch.xp * xpMultiplier(level));
+
+        return (
+          <div key={ch.id} style={{
+            background: 'var(--surface)', border: '1px solid var(--border)',
+            borderRadius: 10, marginBottom: 10, overflow: 'hidden',
+          }}>
+            <div style={{ padding: '12px 14px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                <span style={{ fontSize: 18 }}>{ch.ic}</span>
+                <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-main)', flex: 1 }}>
+                  {ch.nm}
+                </span>
+                {ch.tm && (
+                  <span style={{
+                    ...mono, fontSize: 10, color: 'var(--text-dim)',
+                    padding: '2px 6px', borderRadius: 4, background: 'rgba(255,255,255,0.04)',
+                  }}>
+                    {ch.tm}
+                  </span>
+                )}
               </div>
-              <div style={{ fontSize: '13px', color: 'var(--text-muted)', marginBottom: '12px', lineHeight: '1.5' }}>
-                {sq.ds}
-              </div>
-              
-              {sq.tasks.length > 0 && (
-                <div style={{ height: '3px', background: 'var(--border)', borderRadius: '2px', overflow: 'hidden', marginBottom: '12px' }}>
-                  <div style={{ height: '100%', background: 'linear-gradient(90deg, #4338ca, #818cf8)', width: `${pct}%`, transition: 'width 0.4s ease' }} />
+              {ch.ds && (
+                <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 8 }}>
+                  {ch.ds}
                 </div>
               )}
-              
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                {sq.tasks.map(t => (
-                  <div 
-                    key={t.id} 
-                    style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', padding: '4px 0', opacity: t.dn ? 0.6 : 1 }}
-                    onClick={() => toggleStoryTask(sq.id, t.id)}
-                  >
-                    <div style={{ 
-                      width: '18px', height: '18px', borderRadius: '4px', border: '1px solid var(--border)',
-                      background: t.dn ? 'rgba(16, 185, 129, 0.1)' : 'transparent',
-                      borderColor: t.dn ? 'rgba(16, 185, 129, 0.4)' : 'var(--border)',
-                      color: '#10b981', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px'
-                    }}>
-                      {t.dn && "✓"}
-                    </div>
-                    <div style={{ fontSize: '14px', textDecoration: t.dn ? 'line-through' : 'none', color: t.dn ? 'var(--text-dim)' : 'var(--text-main)' }}>
-                      {t.tx}
-                    </div>
-                  </div>
-                ))}
+
+              {/* Progress bar */}
+              <div style={{ height: 3, borderRadius: 2, background: 'var(--border)', marginBottom: 10 }}>
+                <div style={{
+                  height: '100%', borderRadius: 2,
+                  width: progress + '%',
+                  background: '#818cf8', transition: 'width 0.3s ease',
+                }} />
               </div>
-              
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '12px', borderTop: '1px solid var(--border)', paddingTop: '12px' }}>
-                <span className="mono text-xs text-muted">{done}/{sq.tasks.length}</span>
-                <button className="btn-ghost" onClick={() => handleAddTask(sq.id)}>+ Task</button>
-                <span className="mono text-xs text-muted">+{xpEarned} XP ea</span>
-              </div>
+
+              {/* Task checklist */}
+              {ch.tasks.map((task) => (
+                <div
+                  key={task.id}
+                  onClick={() => toggleStoryTask(ch.id, task.id)}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 8,
+                    padding: '5px 0', cursor: 'pointer', userSelect: 'none',
+                  }}
+                >
+                  <span style={{
+                    width: 16, height: 16, borderRadius: 4,
+                    border: task.dn ? '2px solid #818cf8' : '2px solid var(--border)',
+                    background: task.dn ? 'rgba(129,140,248,0.2)' : 'transparent',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    fontSize: 10, color: '#818cf8', flexShrink: 0,
+                  }}>
+                    {task.dn ? '✓' : ''}
+                  </span>
+                  <span style={{
+                    fontSize: 13,
+                    color: task.dn ? 'var(--text-dim)' : 'var(--text-main)',
+                    textDecoration: task.dn ? 'line-through' : 'none',
+                  }}>
+                    {task.tx}
+                  </span>
+                </div>
+              ))}
             </div>
-          );
-        })}
-      </div>
+
+            {/* Footer */}
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: 8,
+              padding: '8px 14px', borderTop: '1px solid var(--border)',
+            }}>
+              <span style={{ ...mono, fontSize: 11, color: 'var(--text-dim)' }}>
+                {done}/{total}
+              </span>
+              <div style={{ flex: 1 }} />
+              <button
+                onClick={() => handleAddTask(ch.id)}
+                style={{
+                  fontSize: 11, color: 'var(--text-dim)',
+                  background: 'transparent', border: 'none', cursor: 'pointer',
+                }}
+              >
+                + Task
+              </button>
+              <span style={{ ...mono, fontSize: 11, color: '#818cf8' }}>
+                +{xpEarned} xp/task
+              </span>
+            </div>
+          </div>
+        );
+      })}
+
+      {storyQuests.length === 0 && (
+        <div style={{ textAlign: 'center', padding: '40px 20px', color: 'var(--text-dim)', fontSize: 14 }}>
+          No chapters yet. Create one to start your story.
+        </div>
+      )}
     </div>
   );
 }

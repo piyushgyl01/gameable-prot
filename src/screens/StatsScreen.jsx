@@ -5,78 +5,108 @@ import { getRankLabel, getRankIndex } from '../lib/systems';
 
 export default function StatsScreen() {
   const { totalXp, history, mastery, streaks, customQuests, resetGame } = useGame();
-  
-  const daysPlayed = Object.keys(history).length;
-  const totalCompleted = Object.values(history).reduce((sum, count) => sum + count, 0);
-  
-  const bestStreak = Math.max(0, ...Object.values(streaks).map(s => s.c));
+
+  const mono = { fontFamily: "'JetBrains Mono', monospace" };
+
+  const questsDone = Object.values(history || {}).reduce((sum, count) => sum + count, 0);
+  const bestStreak = Math.max(0, ...Object.values(streaks || {}).map((s) => s.c || 0));
+  const daysPlayed = Object.keys(history || {}).length;
 
   const handleReset = () => {
-    if (confirm("Are you sure? This will wipe all your progress permanently.")) {
-      if (confirm("Absolutely sure?")) {
+    if (window.confirm('Reset ALL game data? This cannot be undone.')) {
+      if (window.confirm('Are you really sure? Everything will be lost.')) {
         resetGame();
       }
     }
   };
 
+  const statCards = [
+    { label: 'Total XP', value: totalXp || 0, color: '#818cf8' },
+    { label: 'Quests Done', value: questsDone, color: '#10b981' },
+    { label: 'Best Streak', value: bestStreak, color: '#eab308' },
+    { label: 'Days Played', value: daysPlayed, color: 'var(--text-main)' },
+  ];
+
   return (
     <div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
-        <span style={{ fontSize: '14px', fontWeight: '800', letterSpacing: '1px', textTransform: 'uppercase', color: 'var(--text-muted)' }}>Stats</span>
+      {/* Header */}
+      <div style={{
+        fontSize: 11, fontWeight: 700, letterSpacing: 1.5,
+        color: 'var(--text-dim)', textTransform: 'uppercase', marginBottom: 14,
+      }}>
+        Stats
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '24px' }}>
-        <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: '16px', textAlign: 'center' }}>
-          <div className="mono" style={{ fontSize: '28px', fontWeight: '700', color: 'var(--accent-mastery)', marginBottom: '4px' }}>{totalXp}</div>
-          <div style={{ fontSize: '10px', fontWeight: '600', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1px' }}>Total XP</div>
-        </div>
-        <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: '16px', textAlign: 'center' }}>
-          <div className="mono" style={{ fontSize: '28px', fontWeight: '700', color: 'var(--accent-vitality)', marginBottom: '4px' }}>{totalCompleted}</div>
-          <div style={{ fontSize: '10px', fontWeight: '600', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1px' }}>Quests Done</div>
-        </div>
-        <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: '16px', textAlign: 'center' }}>
-          <div className="mono" style={{ fontSize: '28px', fontWeight: '700', color: '#eab308', marginBottom: '4px' }}>{bestStreak}</div>
-          <div style={{ fontSize: '10px', fontWeight: '600', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1px' }}>Best Streak</div>
-        </div>
-        <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: '16px', textAlign: 'center' }}>
-          <div className="mono" style={{ fontSize: '28px', fontWeight: '700', color: 'var(--text-main)', marginBottom: '4px' }}>{daysPlayed}</div>
-          <div style={{ fontSize: '10px', fontWeight: '600', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1px' }}>Days Played</div>
-        </div>
+      {/* 2x2 stat grid */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 20 }}>
+        {statCards.map((sc) => (
+          <div key={sc.label} style={{
+            background: 'var(--surface)', border: '1px solid var(--border)',
+            borderRadius: 10, padding: 14, textAlign: 'center',
+          }}>
+            <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 6 }}>
+              {sc.label}
+            </div>
+            <div style={{ ...mono, fontSize: 22, fontWeight: 700, color: sc.color }}>
+              {sc.value.toLocaleString()}
+            </div>
+          </div>
+        ))}
       </div>
 
-      <div style={{ fontSize: '14px', fontWeight: '700', marginBottom: '12px' }}>Mastery Lines</div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '40px' }}>
-        {MAIN_QUESTS.map(mq => {
-          const comp = mastery[mq.id] || 0;
-          const rk = getRankIndex(comp);
-          const st = streaks[mq.id]?.c || 0;
-          const cust = customQuests[mq.id]?.length || 0;
-          
-          return (
-            <div key={mq.id} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: '12px 16px', display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <span style={{ fontSize: '20px' }}>{mq.ic}</span>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontSize: '13px', fontWeight: '700' }}>{mq.nm}</div>
-                <div className="mono text-xs text-muted" style={{ display: 'flex', gap: '10px' }}>
-                  <span style={{ color: PILLARS[mq.p].c }}>Rk {getRankLabel(rk)}</span>
-                  <span>{comp} done</span>
-                </div>
+      {/* Mastery Lines */}
+      <div style={{
+        fontSize: 11, fontWeight: 700, letterSpacing: 1.5,
+        color: 'var(--text-dim)', textTransform: 'uppercase', marginBottom: 10,
+      }}>
+        Mastery Lines
+      </div>
+
+      {MAIN_QUESTS.map((mq) => {
+        const comp = mastery[mq.id] || 0;
+        const rankIdx = getRankIndex(comp);
+        const streak = streaks[mq.id]?.c || 0;
+        const pc = PILLARS[mq.p];
+        const customs = (customQuests[mq.id] || []).length;
+
+        return (
+          <div key={mq.id} style={{
+            display: 'flex', alignItems: 'center', gap: 10,
+            padding: '10px 14px', background: 'var(--surface)',
+            border: '1px solid var(--border)', borderRadius: 10, marginBottom: 8,
+          }}>
+            <span style={{ fontSize: 18 }}>{mq.ic}</span>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-main)' }}>
+                {mq.nm}
               </div>
-              <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-                {st > 0 && <span className="mono text-xs" style={{ color: '#eab308' }}>🔥{st}</span>}
-                {cust > 0 && <span className="mono text-xs text-muted">+{cust} cust</span>}
+              <div style={{ ...mono, fontSize: 11, color: pc?.color || 'var(--text-dim)', marginTop: 2 }}>
+                {getRankLabel(rankIdx)} • {comp} completions
               </div>
             </div>
-          );
-        })}
-      </div>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 2 }}>
+              {streak > 0 && (
+                <span style={{ ...mono, fontSize: 11, color: '#eab308' }}>🔥 {streak}</span>
+              )}
+              {customs > 0 && (
+                <span style={{ ...mono, fontSize: 10, color: 'var(--text-dim)' }}>+{customs} custom</span>
+              )}
+            </div>
+          </div>
+        );
+      })}
 
-      <div style={{ padding: '20px', borderTop: '1px solid var(--border)', textAlign: 'center' }}>
-        <button 
-          style={{ background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', border: '1px solid rgba(239, 68, 68, 0.4)', padding: '10px 20px', borderRadius: '6px', fontSize: '12px', fontWeight: '700', cursor: 'pointer' }}
+      {/* Reset */}
+      <div style={{ marginTop: 30, textAlign: 'center' }}>
+        <button
           onClick={handleReset}
+          style={{
+            fontSize: 12, fontWeight: 600, padding: '8px 20px', borderRadius: 8,
+            border: '1px solid rgba(239,68,68,0.3)', background: 'rgba(239,68,68,0.08)',
+            color: '#ef4444', cursor: 'pointer',
+          }}
         >
-          Reset All Data
+          Reset Game
         </button>
       </div>
     </div>

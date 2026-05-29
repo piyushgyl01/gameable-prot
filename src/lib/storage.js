@@ -1,27 +1,27 @@
-const STORAGE_KEY = "liferpg_v5_web";
+const KEY = 'liferpg_v5';
 
 export function saveGameState(state) {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    localStorage.setItem(KEY, JSON.stringify(state));
   } catch (e) {
-    console.error("Failed to save state", e);
+    console.warn('Save failed:', e);
   }
 }
 
 export function loadGameState() {
   try {
-    const data = localStorage.getItem(STORAGE_KEY);
-    return data ? JSON.parse(data) : null;
+    const raw = localStorage.getItem(KEY);
+    return raw ? JSON.parse(raw) : null;
   } catch (e) {
-    console.error("Failed to load state", e);
+    console.warn('Load failed:', e);
     return null;
   }
 }
 
 export function clearGameState() {
   try {
-    localStorage.removeItem(STORAGE_KEY);
+    localStorage.removeItem(KEY);
   } catch (e) {
-    console.error("Failed to clear state", e);
+    console.warn('Clear failed:', e);
   }
 }

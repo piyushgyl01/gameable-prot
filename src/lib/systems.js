@@ -1,15 +1,16 @@
-// XP required grows steeply
+// ── XP System ──────────────────────────────────────────
+// XP required grows steeply — level 100 is genuinely far.
 export function xpRequired(lv) {
   return Math.floor(250 * Math.pow(1.2, lv - 1));
 }
 
-// XP earned scales with your level
+// XP earned scales with your level — rewards progress.
 export function xpMultiplier(lv) {
   return 1 + (lv - 1) * 0.05;
 }
 
-// Ranks
-export const RANKS = ["I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X"];
+// ── Ranks ──────────────────────────────────────────────
+export const RANKS = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X'];
 export const RANK_THRESHOLDS = [0, 5, 12, 22, 35, 52, 74, 102, 138, 185, 250];
 
 export function getRankIndex(completions) {
@@ -28,22 +29,23 @@ export function getNextRankThreshold(rankIndex) {
   return rankIndex < RANK_THRESHOLDS.length - 1 ? RANK_THRESHOLDS[rankIndex + 1] : null;
 }
 
-// Energy
+// ── Energy as Time ─────────────────────────────────────
+// 240 energy = 24 hours. 1 energy = 6 minutes.
 export const MAX_ENERGY = 240;
 
 export function formatEnergyTime(en) {
   const m = Math.round(en * 6);
   const h = Math.floor(m / 60);
   const r = m % 60;
-  return h ? `${h}h${r}m` : `${r}m`;
+  return h ? h + 'h' + r + 'm' : r + 'm';
 }
 
-// Dates
+// ── Date Helpers ───────────────────────────────────────
 export function getTodayString() {
   return new Date().toISOString().slice(0, 10);
 }
 
-// Random utils
+// ── Random / Shuffle ───────────────────────────────────
 export function stringHash(s) {
   let v = 0;
   for (let i = 0; i < s.length; i++) {
