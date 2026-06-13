@@ -73,7 +73,7 @@ function Sidebar({ activeScreen, setActiveScreen, profile, rank }) {
       </nav>
 
       <div className="sidebar-footer">
-        <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>Life RPG v1.0</div>
+        <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>Gameable v1.0</div>
       </div>
     </div>
   );

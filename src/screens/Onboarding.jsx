@@ -78,7 +78,7 @@ export default function Onboarding() {
           {/* Step 1: Welcome */}
           {step === 1 && (
             <div>
-              <h1 style={{ marginBottom: 8 }}>Welcome to Life RPG</h1>
+              <h1 style={{ marginBottom: 8 }}>Welcome to Gameable</h1>
               <p style={{ color: 'var(--text-secondary)', fontSize: 14, lineHeight: 1.6, marginBottom: 24 }}>
                 Turn your life into a game. Your journey spans three pillars:
               </p>

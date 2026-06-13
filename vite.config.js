@@ -13,8 +13,8 @@ export default defineConfig({
         enabled: true
       },
       manifest: {
-        name: 'Life RPG',
-        short_name: 'Life RPG',
+        name: 'Gameable',
+        short_name: 'Gameable',
         description: 'Gamify your daily life and tasks.',
         theme_color: '#09090b',
         background_color: '#09090b',
