@@ -1,171 +1,137 @@
 import React, { useState } from 'react';
 import { useGame } from '../context/GameContext';
+import { generateDailyQuests } from '../lib/gemini';
+import { PILLARS } from '../lib/progression';
 
 export default function Dashboard() {
-  const { profile, quests, completeQuest, getRequiredXp, resetProgress } = useGame();
-  const [activeTab, setActiveTab] = useState('main'); // main, story, side
+  const { profile, settings, dailyQuests, questArcs, sideQuests, recentLog, rank, requiredXp, completeDaily, addDailyQuestsBatch } = useGame();
+  const [generating, setGenerating] = useState(false);
+  const [genError, setGenError] = useState('');
 
-  const reqXp = getRequiredXp(profile.level);
-  const xpPct = (profile.xp / reqXp) * 100;
+  const today = new Date();
+  const dateStr = today.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
 
-  const filteredQuests = quests.filter(q => q.type === activeTab);
+  const xpPct = profile ? (profile.xp / requiredXp) * 100 : 0;
+
+  const activeArcs = questArcs.filter(a => a.status === 'active');
+
+  const handleGenerateDaily = async () => {
+    setGenerating(true);
+    setGenError('');
+    try {
+      const quests = await generateDailyQuests(settings.geminiKey, {
+        activeArcs,
+        activeSideQuests: sideQuests.filter(q => q.status === 'active'),
+        recentCompletions: recentLog.filter(l => {
+          const d = new Date(l.completedAt);
+          const week = new Date(); week.setDate(week.getDate() - 7);
+          return d > week;
+        }),
+        profile,
+      });
+      await addDailyQuestsBatch(quests);
+    } catch (err) {
+      setGenError(err.message);
+    }
+    setGenerating(false);
+  };
+
+  const completedToday = dailyQuests.filter(q => q.status === 'completed').length;
+  const totalToday = dailyQuests.length;
 
   return (
-    <div style={{ display: 'flex', minHeight: '100vh' }}>
-      
-      {/* Sidebar Navigation */}
-      <div style={{
-        width: 300, background: 'var(--bg-card)', borderRight: '1px solid var(--border-color)',
-        padding: 24, display: 'flex', flexDirection: 'column'
-      }}>
-        {/* Character Profile */}
-        <div style={{ textAlign: 'center', marginBottom: 40 }}>
-          <div style={{
-            width: 80, height: 80, borderRadius: 40, background: 'var(--bg-main)',
-            border: '2px solid var(--border-color)', margin: '0 auto 16px', display: 'flex',
-            alignItems: 'center', justifyContent: 'center', fontSize: 32,
-          }}>
-            👤
-          </div>
-          <div style={{ fontSize: 13, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 4 }}>
-            Level {profile.level}
-          </div>
-          
-          {/* XP Bar */}
-          <div style={{ background: 'var(--bg-main)', height: 6, borderRadius: 3, overflow: 'hidden', position: 'relative', marginBottom: 8, marginTop: 12 }}>
-            <div style={{
-              position: 'absolute', top: 0, left: 0, height: '100%', width: `${xpPct}%`,
-              background: 'var(--accent-primary)', transition: 'width 0.3s ease'
-            }} />
-          </div>
-          <div style={{ fontSize: 11, fontFamily: "var(--font-mono)", color: 'var(--text-muted)' }}>
-            {profile.xp} / {reqXp} XP
-          </div>
-        </div>
+    <div className="animate-in">
+      {/* Header */}
+      <div style={{ marginBottom: 24 }}>
+        <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 4 }}>{dateStr}</div>
+        <h1>Level {profile?.level || 1} · {rank}</h1>
+      </div>
 
-        {/* Stats Radar (Simplified bars for now) */}
-        <div style={{ marginBottom: 40 }}>
-          <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 16 }}>
-            Core Pillars
-          </div>
-          {[
-            { label: 'Health', val: profile.stats.health, color: 'var(--color-health)' },
-            { label: 'Wealth', val: profile.stats.wealth, color: 'var(--color-wealth)' },
-            { label: 'Relationships', val: profile.stats.relationships, color: 'var(--color-relations)' },
-          ].map(stat => (
-            <div key={stat.label} style={{ marginBottom: 12 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 6 }}>
-                <span style={{ color: 'var(--text-main)', fontWeight: 500 }}>{stat.label}</span>
-                <span style={{ fontFamily: 'var(--font-mono)', color: stat.color }}>{stat.val}</span>
-              </div>
-              <div style={{ background: 'var(--bg-main)', height: 4, borderRadius: 2 }}>
-                <div style={{ background: stat.color, width: `${Math.min(100, stat.val * 5)}%`, height: '100%', borderRadius: 2 }} />
-              </div>
-            </div>
-          ))}
+      {/* XP Bar */}
+      <div style={{ marginBottom: 32 }}>
+        <div className="xp-bar">
+          <div className="xp-bar-fill" style={{ width: `${xpPct}%` }} />
         </div>
+        <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 6 }} className="mono">
+          {profile?.xp || 0} / {requiredXp} XP
+        </div>
+      </div>
 
-        {/* Navigation Tabs */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 'auto' }}>
-          {[
-            { id: 'main', label: 'Main Quests' },
-            { id: 'story', label: 'Story Arcs' },
-            { id: 'side', label: 'Side Quests' },
-          ].map(t => (
-            <button
-              key={t.id}
-              onClick={() => setActiveTab(t.id)}
-              style={{
-                background: activeTab === t.id ? 'var(--bg-card-hover)' : 'transparent',
-                border: `1px solid ${activeTab === t.id ? 'var(--border-focus)' : 'transparent'}`,
-                padding: '10px 16px', borderRadius: 8, color: activeTab === t.id ? '#fff' : 'var(--text-dim)',
-                display: 'flex', alignItems: 'center', fontSize: 14, fontWeight: 600,
-                textAlign: 'left', outline: 'none', cursor: 'pointer', transition: 'all 0.2s'
-              }}
-            >
-              {t.label}
+      {/* Today's Quests */}
+      <div style={{ marginBottom: 40 }}>
+        <div className="section-header">
+          <div className="section-title">Today's Quests {totalToday > 0 && `(${completedToday}/${totalToday})`}</div>
+          {totalToday > 0 && (
+            <button className="btn btn-sm" onClick={handleGenerateDaily} disabled={generating}>
+              {generating ? 'Generating...' : '+ More'}
             </button>
-          ))}
-        </div>
-        
-        <button className="btn" style={{ marginTop: 24, fontSize: 12, color: 'var(--color-health)' }} onClick={resetProgress}>
-          Reset Progress
-        </button>
-      </div>
-
-      {/* Main Content */}
-      <div style={{ flex: 1, padding: '40px', display: 'flex', flexDirection: 'column', overflowY: 'auto' }}>
-        
-        {/* Header */}
-        <div style={{ marginBottom: 32 }}>
-          <div style={{ fontSize: 13, color: 'var(--text-dim)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 }}>
-            Ultimate Endgame
-          </div>
-          <div style={{ fontSize: 24, fontWeight: 800, color: 'var(--text-main)' }}>
-            {profile.endgame}
-          </div>
+          )}
         </div>
 
-        {/* Quest List */}
-        <div>
-          <div style={{ fontSize: 18, fontWeight: 700, marginBottom: 20, textTransform: 'capitalize', color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: 12 }}>
-            {activeTab} Quests
-            <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', background: 'var(--bg-card)', padding: '2px 8px', borderRadius: 10 }}>
-              {filteredQuests.length}
-            </span>
+        {genError && (
+          <div style={{ color: 'var(--color-health)', fontSize: 13, marginBottom: 12, padding: '8px 12px', background: 'rgba(239,68,68,0.1)', borderRadius: 6 }}>{genError}</div>
+        )}
+
+        {totalToday === 0 ? (
+          <div className="card" style={{ padding: 32, textAlign: 'center' }}>
+            <p style={{ color: 'var(--text-secondary)', marginBottom: 16 }}>No quests for today yet.</p>
+            <button className="btn btn-primary" onClick={handleGenerateDaily} disabled={generating}>
+              {generating ? <><div className="spinner" style={{ width: 14, height: 14 }} /> Generating...</> : 'Generate Daily Quests'}
+            </button>
           </div>
-
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-            {filteredQuests.length === 0 ? (
-              <div style={{ textAlign: 'center', color: 'var(--text-muted)', marginTop: 40, padding: 40, background: 'var(--bg-card)', borderRadius: 12, border: '1px dashed var(--border-color)' }}>
-                No {activeTab} quests generated.
-              </div>
-            ) : (
-              filteredQuests.map(q => {
-                const isCompleted = q.status === 'completed';
-                return (
-                  <div key={q.id} className="card" style={{
-                    padding: 24, display: 'flex', alignItems: 'flex-start', gap: 20,
-                    opacity: isCompleted ? 0.6 : 1
-                  }}>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
-                        <div style={{ fontSize: 16, fontWeight: 700, textDecoration: isCompleted ? 'line-through' : 'none' }}>
-                          {q.title}
-                        </div>
-                        <div className={`badge badge-${q.pillar}`}>{q.pillar}</div>
-                      </div>
-                      <div style={{ fontSize: 14, color: 'var(--text-dim)', lineHeight: 1.5 }}>
-                        {q.desc}
-                      </div>
-                    </div>
-
-                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 12 }}>
-                      <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>
-                        +{q.type === 'main' ? 100 : q.type === 'story' ? 50 : 20} XP
-                      </div>
-                      {!isCompleted ? (
-                        <button 
-                          className="btn btn-primary" 
-                          style={{ padding: '6px 16px', fontSize: 13 }}
-                          onClick={() => completeQuest(q.id)}
-                        >
-                          Complete
-                        </button>
-                      ) : (
-                        <div style={{ color: 'var(--accent-primary)', fontWeight: 700, fontSize: 13, padding: '6px 16px', border: '1px solid rgba(16, 185, 129, 0.2)', borderRadius: 8, background: 'rgba(16, 185, 129, 0.1)' }}>
-                          Completed
-                        </div>
-                      )}
-                    </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {dailyQuests.map(q => {
+              const done = q.status === 'completed';
+              const pillar = PILLARS[q.pillar] || {};
+              return (
+                <div key={q.id} className="card" style={{ padding: '14px 18px', display: 'flex', alignItems: 'center', gap: 14, opacity: done ? 0.5 : 1 }}>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 14, fontWeight: 600, textDecoration: done ? 'line-through' : 'none' }}>{q.title}</div>
+                    {q.desc && <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>{q.desc}</div>}
                   </div>
-                );
-              })
-            )}
+                  <span className={`badge badge-${q.pillar}`}>{q.pillar}</span>
+                  <span className="mono" style={{ fontSize: 12, color: 'var(--text-muted)', minWidth: 44, textAlign: 'right' }}>+{q.xpReward || 20}</span>
+                  {!done ? (
+                    <button className="btn btn-primary btn-sm" onClick={() => completeDaily(q.id)}>Done</button>
+                  ) : (
+                    <span style={{ color: 'var(--accent)', fontSize: 16 }}>✓</span>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* Active Story Arcs */}
+      {activeArcs.length > 0 && (
+        <div>
+          <div className="section-header">
+            <div className="section-title">Active Story Arcs</div>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 12 }}>
+            {activeArcs.map(arc => {
+              const doneSteps = arc.steps?.filter(s => s.done).length || 0;
+              const totalSteps = arc.steps?.length || 1;
+              const pct = (doneSteps / totalSteps) * 100;
+              const pillar = PILLARS[arc.pillar] || {};
+              return (
+                <div key={arc.id} className="card" style={{ padding: 18 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                    <span style={{ fontSize: 14, fontWeight: 600, flex: 1 }}>{arc.title}</span>
+                    <span className={`badge badge-${arc.pillar}`}>{arc.pillar}</span>
+                  </div>
+                  <div className="progress-bar" style={{ marginBottom: 6 }}>
+                    <div className="progress-bar-fill" style={{ width: `${pct}%`, background: pillar.color || 'var(--accent)' }} />
+                  </div>
+                  <div className="mono" style={{ fontSize: 11, color: 'var(--text-muted)' }}>{doneSteps} / {totalSteps} steps</div>
+                </div>
+              );
+            })}
           </div>
         </div>
-
-      </div>
+      )}
     </div>
   );
 }
