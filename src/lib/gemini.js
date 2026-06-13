@@ -137,7 +137,7 @@ Respond ONLY with the JSON array.`;
 // --- Chat with The Architect ---
 
 export async function chatWithArchitect(apiKey, message, context) {
-  const { profile, activeArcs, activeSideQuests } = context;
+  const { profile, activeArcs, activeSideQuests, chatHistory } = context;
 
   const prompt = `You are "The Architect" — an AI life-coach entity inside a gamified life app.
 You speak in a calm, direct, and slightly wise tone. You're practical, not flowery.
@@ -149,6 +149,9 @@ User context:
 - Current position: ${profile.current}
 - Active story arcs: ${activeArcs.map(a => a.title).join(', ')}
 - Active side quests: ${activeSideQuests.map(q => q.title).join(', ')}
+
+Recent conversation history:
+${chatHistory && chatHistory.length > 0 ? chatHistory.map(m => `${m.role === 'user' ? 'User' : 'Architect'}: ${m.content}`).join('\n') : 'No recent history.'}
 
 The user says: "${message}"
 

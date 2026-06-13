@@ -30,6 +30,7 @@ export default function Chat() {
         profile,
         activeArcs,
         activeSideQuests: activeSides,
+        chatHistory: chatMessages.slice(-6),
       });
       await addArchitectReply(reply);
     } catch (err) {
