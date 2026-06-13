@@ -68,7 +68,13 @@ export default function Dashboard() {
       {/* Today's Quests */}
       <div style={{ marginBottom: 40 }}>
         <div className="section-header">
-          <div className="section-title">Today's Quests {totalToday > 0 && `(${completedToday}/${totalToday})`}</div>
+          <div className="section-title">
+            Today's Quests {totalToday > 0 && (
+              completedToday >= 4 
+                ? <span style={{ color: 'var(--accent)', fontWeight: 'normal', fontSize: 13 }}> (Daily Goal Completed 🔥)</span>
+                : <span style={{ fontWeight: 'normal', fontSize: 13, color: 'var(--text-muted)' }}> ({completedToday}/4)</span>
+            )}
+          </div>
           {totalToday > 0 && (
             <button className="btn btn-sm" onClick={handleGenerateDaily} disabled={generating}>
               {generating ? 'Generating...' : '+ More'}

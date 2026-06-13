@@ -176,7 +176,8 @@ export function GameProvider({ children }) {
   const updateStreak = async () => {
     const today = new Date().toISOString().split('T')[0];
     const todayQuests = await getTodayQuests();
-    const allDone = todayQuests.length > 0 && todayQuests.every(q => q.status === 'completed');
+    const completedCount = todayQuests.filter(q => q.status === 'completed').length;
+    const allDone = completedCount >= 4;
 
     if (!allDone) return;
 
@@ -243,7 +244,7 @@ export function GameProvider({ children }) {
 
     // Check if all dailies are now done → update streak
     const updatedDaily = await getTodayQuests();
-    if (updatedDaily.every(q => q.status === 'completed')) {
+    if (updatedDaily.filter(q => q.status === 'completed').length === 4) {
       await updateStreak();
     }
 
