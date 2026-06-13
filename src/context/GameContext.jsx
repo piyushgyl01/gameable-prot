@@ -2,7 +2,7 @@ import React, { createContext, useContext, useState, useEffect, useCallback } fr
 import {
   getProfile, saveProfile, updateProfile as dbUpdateProfile,
   getSettings, saveSettings,
-  getQuestArcs, getActiveSideQuests, getTodayQuests,
+  getQuestArcs, getSideQuests, getTodayQuests,
   addToQuestLog, updateDailyQuest, updateQuestArc, updateSideQuest, addQuestArc,
   bulkAddArcs, bulkAddSideQuests, bulkAddDailyQuests,
   getRecentLog, getChatMessages, addChatMessage, clearChat, removeQuestLogEntryByQuestId,
@@ -33,7 +33,7 @@ export function GameProvider({ children }) {
       getProfile(),
       getSettings(),
       getQuestArcs(),
-      getActiveSideQuests(),
+      getSideQuests(),
       getTodayQuests(),
       getRecentLog(30),
       getChatMessages(),
@@ -82,8 +82,39 @@ export function GameProvider({ children }) {
     const doAutoGenerate = async () => {
       setAutoGenerating(true);
       try {
+        // --- Reset recurring side quests ---
+        const now = new Date();
+        const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+        let sidesUpdated = false;
+
+        for (const sq of sideQuests) {
+          if (sq.status === 'completed' && sq.updatedAt) {
+            const updatedTime = new Date(sq.updatedAt).getTime();
+            let shouldReset = false;
+            
+            if (sq.frequency === 'daily' && updatedTime < startOfToday) {
+              shouldReset = true;
+            } else if (sq.frequency === 'weekly' && (now.getTime() - updatedTime) > 7 * 24 * 60 * 60 * 1000) {
+              shouldReset = true;
+            } else if (!sq.frequency) { // fallback reset
+              shouldReset = true;
+            }
+
+            if (shouldReset) {
+              await updateSideQuest(sq.id, { status: 'active', updatedAt: now.toISOString() });
+              sidesUpdated = true;
+            }
+          }
+        }
+        
+        let currentSides = sideQuests;
+        if (sidesUpdated) {
+          currentSides = await getSideQuests();
+          setSideQuests(currentSides);
+        }
+
         const activeArcs = questArcs.filter(a => a.status === 'active');
-        const activeSides = sideQuests.filter(q => q.status === 'active');
+        const activeSides = currentSides.filter(q => q.status === 'active');
         const weekAgo = new Date(); weekAgo.setDate(weekAgo.getDate() - 7);
         const recentCompletions = recentLog.filter(l => new Date(l.completedAt) > weekAgo);
 
@@ -315,7 +346,7 @@ export function GameProvider({ children }) {
     const quest = sideQuests.find(q => q.id === questId);
     if (!quest) return;
 
-    await updateSideQuest(questId, { status: 'completed' });
+    await updateSideQuest(questId, { status: 'completed', updatedAt: new Date().toISOString() });
     await addToQuestLog({
       questId,
       questType: 'side',
