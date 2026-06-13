@@ -1,40 +1,92 @@
-const GEMINI_MODEL = 'gemini-3.5-flash';
+// --- Gemini API Layer ---
+// One request per call. No hidden retries. Global queue prevents concurrent requests.
+
+const MODELS = ['gemini-2.5-flash', 'gemini-2.0-flash']; // fallback chain
 const API_BASE = 'https://generativelanguage.googleapis.com/v1beta';
 
-async function callGemini(apiKey, prompt, maxRetries = 3) {
-  let attempt = 0;
-  
-  while (attempt < maxRetries) {
-    const response = await fetch(`${API_BASE}/models/${GEMINI_MODEL}:generateContent?key=${apiKey}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: { temperature: 0.7 },
-      }),
-    });
+// Global request queue — only 1 request at a time to avoid burning quota
+let requestInFlight = false;
+const requestQueue = [];
 
-    if (!response.ok) {
-      if (response.status === 503 || response.status === 429) {
-        attempt++;
-        if (attempt < maxRetries) {
-          const waitTime = Math.pow(2, attempt) * 1000; // Exponential backoff: 2s, 4s, 8s...
-          console.warn(`API Error ${response.status}. Retrying in ${waitTime}ms... (Attempt ${attempt}/${maxRetries})`);
-          await new Promise(res => setTimeout(res, waitTime));
-          continue;
+function enqueue(fn) {
+  return new Promise((resolve, reject) => {
+    const run = async () => {
+      requestInFlight = true;
+      try {
+        resolve(await fn());
+      } catch (err) {
+        reject(err);
+      } finally {
+        requestInFlight = false;
+        if (requestQueue.length > 0) {
+          requestQueue.shift()();
         }
       }
+    };
+    if (requestInFlight) {
+      requestQueue.push(run);
+    } else {
+      run();
+    }
+  });
+}
+
+async function callGemini(apiKey, prompt) {
+  return enqueue(async () => {
+    // Try each model in the fallback chain
+    for (let i = 0; i < MODELS.length; i++) {
+      const model = MODELS[i];
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 30000);
+
+      let response;
+      try {
+        response = await fetch(`${API_BASE}/models/${model}:generateContent?key=${apiKey}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: prompt }] }],
+            generationConfig: { temperature: 0.7 },
+          }),
+          signal: controller.signal,
+        });
+      } catch (fetchErr) {
+        clearTimeout(timeout);
+        if (fetchErr.name === 'AbortError') {
+          throw new Error('Request timed out. Check your connection and try again.');
+        }
+        throw new Error('Network error. Check your connection.');
+      }
+      clearTimeout(timeout);
+
+      if (response.ok) {
+        const data = await response.json();
+        if (!data.candidates || data.candidates.length === 0) {
+          throw new Error('AI returned an empty response. Try again.');
+        }
+        return data.candidates[0].content.parts[0].text;
+      }
+
+      // On 429: try next model in fallback chain instead of retrying same one
+      if (response.status === 429 && i < MODELS.length - 1) {
+        console.warn(`${model} rate limited, falling back to ${MODELS[i + 1]}`);
+        continue;
+      }
+
+      // All models exhausted or non-429 error
       const errorData = await response.json().catch(() => ({}));
-      throw new Error(`API Error ${response.status}: ${errorData.error?.message || 'Request failed'}`);
-    }
+      const msg = errorData.error?.message || 'Request failed';
 
-    const data = await response.json();
-    if (!data.candidates || data.candidates.length === 0) {
-      throw new Error('AI returned an empty response.');
-    }
+      if (response.status === 429) {
+        // Parse wait time for user-friendly message
+        const match = msg.match(/retry in ([\d.]+)s/i);
+        const waitSec = match ? Math.ceil(parseFloat(match[1])) : 60;
+        throw new Error(`Rate limited. Wait ${waitSec}s and try again.`);
+      }
 
-    return data.candidates[0].content.parts[0].text;
-  }
+      throw new Error(`API Error ${response.status}: ${msg}`);
+    }
+  });
 }
 
 function parseJSON(text) {
@@ -43,7 +95,7 @@ function parseJSON(text) {
     return JSON.parse(cleaned);
   } catch (e) {
     console.error('Failed to parse AI JSON:', text);
-    throw new Error('AI returned invalid JSON. Please try again.');
+    throw new Error('AI returned invalid data. Please try again.');
   }
 }
 

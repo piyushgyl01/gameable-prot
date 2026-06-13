@@ -17,6 +17,7 @@ export default function Onboarding() {
   const [current, setCurrent] = useState('');
   const [apiKey, setApiKey] = useState(settings?.geminiKey || '');
   const [error, setError] = useState('');
+  const [retryCountdown, setRetryCountdown] = useState(0);
   const [generatedData, setGeneratedData] = useState(null);
 
   const next = () => { setError(''); setStep(s => s + 1); };
@@ -45,7 +46,12 @@ export default function Onboarding() {
       setGeneratedData(data);
       setStep(9);
     } catch (err) {
-      setError(err.message || 'Generation failed.');
+      const msg = err.message || 'Generation failed.';
+      if (msg.includes('429')) {
+        setError('API rate limit hit. Wait 1-2 minutes, then try again.');
+      } else {
+        setError(msg);
+      }
       setStep(7);
     }
   };
@@ -167,7 +173,11 @@ export default function Onboarding() {
             <div style={{ textAlign: 'center', padding: '40px 0' }}>
               <div className="spinner" style={{ width: 32, height: 32, margin: '0 auto 24px' }} />
               <h2 style={{ marginBottom: 8 }}>The Architect is analyzing your path...</h2>
-              <p style={{ fontSize: 13, color: 'var(--text-muted)' }}>Generating personalized quests from your life data.</p>
+              <p style={{ fontSize: 13, color: 'var(--text-muted)' }}>
+                {retryCountdown > 0
+                  ? `Rate limited. Auto-retrying in ${retryCountdown}s...`
+                  : 'Generating personalized quests from your life data.'}
+              </p>
             </div>
           )}
 

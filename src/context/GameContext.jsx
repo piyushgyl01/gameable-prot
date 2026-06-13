@@ -65,8 +65,19 @@ export function GameProvider({ children }) {
   // --- Auto-generate daily quests on new day ---
   useEffect(() => {
     if (loading || !settings?.onboardingComplete || !settings?.geminiKey || !profile) return;
-    if (dailyQuests.length > 0) return; // Already have quests for today
+    if (dailyQuests.length > 0) return;
     if (autoGenerating) return;
+
+    // Cooldown persists across refreshes — prevents quota burn on reload loops
+    const cooldownUntil = localStorage.getItem('gameable_api_cooldown');
+    if (cooldownUntil && Date.now() < parseInt(cooldownUntil)) {
+      const remaining = parseInt(cooldownUntil) - Date.now();
+      const timer = setTimeout(() => {
+        localStorage.removeItem('gameable_api_cooldown');
+        setAutoGenerating(false);
+      }, remaining);
+      return () => clearTimeout(timer);
+    }
 
     const doAutoGenerate = async () => {
       setAutoGenerating(true);
@@ -85,8 +96,13 @@ export function GameProvider({ children }) {
         await bulkAddDailyQuests(quests);
         const updated = await getTodayQuests();
         setDailyQuests(updated);
+        localStorage.removeItem('gameable_api_cooldown');
       } catch (err) {
         console.error('Auto daily generation failed:', err);
+        // 5-minute cooldown — prevents quota death spiral
+        localStorage.setItem('gameable_api_cooldown', String(Date.now() + 300000));
+        setTimeout(() => setAutoGenerating(false), 300000);
+        return;
       }
       setAutoGenerating(false);
     };
@@ -234,7 +250,7 @@ export function GameProvider({ children }) {
     // If arc is fully completed, generate the next one automatically
     if (allDone) {
       setAutoGeneratingArcs(true);
-      setToastMessage(`The Architect is crafting your next ${arc.pillar} arc...`);
+      setToastMessage(`Arc complete! Generating next ${arc.pillar} arc...`);
       try {
         const nextArc = await generateNextStoryArc(settings.geminiKey, {
           profile,
@@ -242,10 +258,12 @@ export function GameProvider({ children }) {
         });
         await addQuestArc(nextArc);
         await loadAll();
-        setToastMessage(`New Story Arc Added: ${nextArc.title}`);
+        setToastMessage(`New Story Arc: ${nextArc.title}`);
       } catch (err) {
         console.error('Failed to auto-generate next arc:', err);
+        setToastMessage('Arc complete! Next arc will generate later.');
       }
+      setTimeout(() => setToastMessage(null), 4000);
       setAutoGeneratingArcs(false);
     }
 
