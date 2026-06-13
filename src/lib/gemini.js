@@ -1,27 +1,40 @@
 const GEMINI_MODEL = 'gemini-3.5-flash';
 const API_BASE = 'https://generativelanguage.googleapis.com/v1beta';
 
-async function callGemini(apiKey, prompt) {
-  const response = await fetch(`${API_BASE}/models/${GEMINI_MODEL}:generateContent?key=${apiKey}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      contents: [{ parts: [{ text: prompt }] }],
-      generationConfig: { temperature: 0.7 },
-    }),
-  });
+async function callGemini(apiKey, prompt, maxRetries = 3) {
+  let attempt = 0;
+  
+  while (attempt < maxRetries) {
+    const response = await fetch(`${API_BASE}/models/${GEMINI_MODEL}:generateContent?key=${apiKey}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: { temperature: 0.7 },
+      }),
+    });
 
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}));
-    throw new Error(`API Error ${response.status}: ${errorData.error?.message || 'Request failed'}`);
+    if (!response.ok) {
+      if (response.status === 503 || response.status === 429) {
+        attempt++;
+        if (attempt < maxRetries) {
+          const waitTime = Math.pow(2, attempt) * 1000; // Exponential backoff: 2s, 4s, 8s...
+          console.warn(`API Error ${response.status}. Retrying in ${waitTime}ms... (Attempt ${attempt}/${maxRetries})`);
+          await new Promise(res => setTimeout(res, waitTime));
+          continue;
+        }
+      }
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(`API Error ${response.status}: ${errorData.error?.message || 'Request failed'}`);
+    }
+
+    const data = await response.json();
+    if (!data.candidates || data.candidates.length === 0) {
+      throw new Error('AI returned an empty response.');
+    }
+
+    return data.candidates[0].content.parts[0].text;
   }
-
-  const data = await response.json();
-  if (!data.candidates || data.candidates.length === 0) {
-    throw new Error('AI returned an empty response.');
-  }
-
-  return data.candidates[0].content.parts[0].text;
 }
 
 function parseJSON(text) {
