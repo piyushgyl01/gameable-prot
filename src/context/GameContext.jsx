@@ -3,12 +3,12 @@ import {
   getProfile, saveProfile, updateProfile as dbUpdateProfile,
   getSettings, saveSettings,
   getQuestArcs, getActiveSideQuests, getTodayQuests,
-  addToQuestLog, updateDailyQuest, updateQuestArc, updateSideQuest,
+  addToQuestLog, updateDailyQuest, updateQuestArc, updateSideQuest, addQuestArc,
   bulkAddArcs, bulkAddSideQuests, bulkAddDailyQuests,
   getRecentLog, getChatMessages, addChatMessage, clearChat,
 } from '../lib/db';
 import { processQuestCompletion, getRequiredXp, getRank } from '../lib/progression';
-import { generateDailyQuests } from '../lib/gemini';
+import { generateDailyQuests, generateNextStoryArc } from '../lib/gemini';
 import { checkAchievements, applyTheme } from '../lib/systems';
 
 const GameContext = createContext();
@@ -23,6 +23,7 @@ export function GameProvider({ children }) {
   const [recentLog, setRecentLog] = useState([]);
   const [chatMessages, setChatMessages] = useState([]);
   const [autoGenerating, setAutoGenerating] = useState(false);
+  const [autoGeneratingArcs, setAutoGeneratingArcs] = useState(false);
   const [unlockedAchievements, setUnlockedAchievements] = useState([]);
   const [toastMessage, setToastMessage] = useState(null);
 
@@ -229,6 +230,25 @@ export function GameProvider({ children }) {
     await dbUpdateProfile({ level: result.newLevel, xp: result.newXp, ...statUpdates });
 
     await loadAll();
+
+    // If arc is fully completed, generate the next one automatically
+    if (allDone) {
+      setAutoGeneratingArcs(true);
+      setToastMessage(`The Architect is crafting your next ${arc.pillar} arc...`);
+      try {
+        const nextArc = await generateNextStoryArc(settings.geminiKey, {
+          profile,
+          completedArc: { ...arc, desc: arc.desc || 'N/A' },
+        });
+        await addQuestArc(nextArc);
+        await loadAll();
+        setToastMessage(`New Story Arc Added: ${nextArc.title}`);
+      } catch (err) {
+        console.error('Failed to auto-generate next arc:', err);
+      }
+      setAutoGeneratingArcs(false);
+    }
+
     return result;
   };
 
@@ -295,6 +315,7 @@ export function GameProvider({ children }) {
   const value = {
     loading,
     autoGenerating,
+    autoGeneratingArcs,
     profile,
     settings,
     questArcs,

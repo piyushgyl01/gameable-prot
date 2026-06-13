@@ -161,6 +161,40 @@ Keep responses concise (2-4 sentences). If they ask to modify quests or goals, t
   return await callGemini(apiKey, prompt);
 }
 
+// --- Automatic Story Arc Generation ---
+
+export async function generateNextStoryArc(apiKey, context) {
+  const { profile, completedArc } = context;
+
+  const prompt = `You are "The Architect" — an AI life-coach inside a gamified life app.
+The user just completed a story arc! 
+
+User: ${profile.name || 'User'} (Level ${profile.level})
+Endgame: ${profile.endgame}
+
+Recently completed arc:
+"${completedArc.title}" (${completedArc.pillar})
+Description: ${completedArc.desc || 'N/A'}
+
+Generate the logical NEXT story arc to continue their progression in the "${completedArc.pillar}" pillar towards their endgame.
+Make it a bit more challenging or a natural evolution from what they just finished.
+
+Return ONLY a JSON object:
+{
+  "title": "string - epic name for the arc",
+  "desc": "string - 1 sentence summary",
+  "pillar": "${completedArc.pillar}",
+  "steps": [
+    { "title": "string", "desc": "string", "done": false }
+  ]
+}
+
+The steps array should have 3-5 concrete, actionable milestones. Respond ONLY with the JSON object.`;
+
+  const text = await callGemini(apiKey, prompt);
+  return parseJSON(text);
+}
+
 // --- Weekly Recalibration ---
 
 export async function recalibrateWeekly(apiKey, context) {
