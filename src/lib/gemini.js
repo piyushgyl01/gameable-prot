@@ -144,3 +144,38 @@ Keep responses concise (2-4 sentences). If they ask to modify quests or goals, t
 
   return await callGemini(apiKey, prompt);
 }
+
+// --- Weekly Recalibration ---
+
+export async function recalibrateWeekly(apiKey, context) {
+  const { profile, activeArcs, activeSideQuests, weeklyStats } = context;
+
+  const prompt = `You are "The Architect" — an AI life-coach inside a gamified life app.
+
+User: ${profile.name || 'User'} (Level ${profile.level})
+Endgame: ${profile.endgame}
+
+Weekly performance summary:
+- Daily quests completed this week: ${weeklyStats.dailyCompleted}
+- Story arc steps completed: ${weeklyStats.storyCompleted}
+- Side quests completed: ${weeklyStats.sideCompleted}
+- Most active pillar: ${weeklyStats.topPillar || 'none'}
+- Least active pillar: ${weeklyStats.weakPillar || 'none'}
+- Current streak: ${weeklyStats.streak} days
+
+Active story arcs: ${activeArcs.map(a => `"${a.title}" (${a.pillar}, ${a.steps?.filter(s => s.done).length}/${a.steps?.length} steps)`).join(', ')}
+
+Based on this week's performance, write a brief weekly recap (2-3 sentences) and suggest adjustments. Be direct and practical.
+
+Return JSON:
+{
+  "recap": "string - brief weekly summary",
+  "suggestion": "string - what to focus on next week",
+  "focusPillar": "health" | "wealth" | "relationships"
+}
+
+Respond ONLY with the JSON object.`;
+
+  const text = await callGemini(apiKey, prompt);
+  return parseJSON(text);
+}

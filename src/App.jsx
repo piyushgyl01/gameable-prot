@@ -4,6 +4,7 @@ import Onboarding from './screens/Onboarding';
 import Dashboard from './screens/Dashboard';
 import QuestBoard from './screens/QuestBoard';
 import Character from './screens/Character';
+import Chat from './screens/Chat';
 import Settings from './screens/Settings';
 
 // Simple SVG icons
@@ -35,11 +36,17 @@ const Icons = {
       <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
     </svg>
   ),
+  chat: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+    </svg>
+  ),
 };
 
 const NAV_ITEMS = [
   { id: 'dashboard', label: 'Dashboard', icon: Icons.home },
   { id: 'quests', label: 'Quest Board', icon: Icons.quests },
+  { id: 'chat', label: 'The Architect', icon: Icons.chat },
   { id: 'character', label: 'Character', icon: Icons.character },
   { id: 'settings', label: 'Settings', icon: Icons.settings },
 ];
@@ -73,7 +80,7 @@ function Sidebar({ activeScreen, setActiveScreen, profile, rank }) {
 }
 
 function AppContent() {
-  const { loading, settings, profile, rank } = useGame();
+  const { loading, settings, profile, rank, toastMessage } = useGame();
   const [activeScreen, setActiveScreen] = useState('dashboard');
 
   if (loading) {
@@ -92,6 +99,7 @@ function AppContent() {
   const screens = {
     dashboard: <Dashboard />,
     quests: <QuestBoard />,
+    chat: <Chat />,
     character: <Character />,
     settings: <Settings />,
   };
@@ -107,6 +115,19 @@ function AppContent() {
       <div className="main-content">
         {screens[activeScreen] || <Dashboard />}
       </div>
+
+      {/* Achievement Toast */}
+      {toastMessage && (
+        <div style={{
+          position: 'fixed', bottom: 24, right: 24, zIndex: 1000,
+          background: 'var(--bg-elevated)', border: '1px solid var(--accent)',
+          borderRadius: 12, padding: '14px 20px', fontSize: 14, fontWeight: 600,
+          color: 'var(--accent)', boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
+          animation: 'fadeIn 0.3s ease-out',
+        }}>
+          {toastMessage}
+        </div>
+      )}
     </div>
   );
 }

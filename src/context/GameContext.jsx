@@ -5,9 +5,11 @@ import {
   getQuestArcs, getActiveSideQuests, getTodayQuests,
   addToQuestLog, updateDailyQuest, updateQuestArc, updateSideQuest,
   bulkAddArcs, bulkAddSideQuests, bulkAddDailyQuests,
-  getRecentLog,
+  getRecentLog, getChatMessages, addChatMessage, clearChat,
 } from '../lib/db';
 import { processQuestCompletion, getRequiredXp, getRank } from '../lib/progression';
+import { generateDailyQuests } from '../lib/gemini';
+import { checkAchievements, applyTheme } from '../lib/systems';
 
 const GameContext = createContext();
 
@@ -19,16 +21,21 @@ export function GameProvider({ children }) {
   const [sideQuests, setSideQuests] = useState([]);
   const [dailyQuests, setDailyQuests] = useState([]);
   const [recentLog, setRecentLog] = useState([]);
+  const [chatMessages, setChatMessages] = useState([]);
+  const [autoGenerating, setAutoGenerating] = useState(false);
+  const [unlockedAchievements, setUnlockedAchievements] = useState([]);
+  const [toastMessage, setToastMessage] = useState(null);
 
   // Load all data from IndexedDB on mount
   const loadAll = useCallback(async () => {
-    const [p, s, arcs, sides, daily, log] = await Promise.all([
+    const [p, s, arcs, sides, daily, log, chat] = await Promise.all([
       getProfile(),
       getSettings(),
       getQuestArcs(),
       getActiveSideQuests(),
       getTodayQuests(),
       getRecentLog(30),
+      getChatMessages(),
     ]);
     setProfile(p || null);
     setSettings(s);
@@ -36,10 +43,55 @@ export function GameProvider({ children }) {
     setSideQuests(sides);
     setDailyQuests(daily);
     setRecentLog(log);
+    setChatMessages(chat);
     setLoading(false);
+
+    // Load unlocked achievements from profile
+    if (p?.unlockedAchievements) {
+      setUnlockedAchievements(p.unlockedAchievements);
+    }
+
+    // Apply saved theme
+    if (s?.theme) {
+      applyTheme(s.theme);
+    }
+
+    return { profile: p, settings: s, arcs, sides, daily };
   }, []);
 
   useEffect(() => { loadAll(); }, [loadAll]);
+
+  // --- Auto-generate daily quests on new day ---
+  useEffect(() => {
+    if (loading || !settings?.onboardingComplete || !settings?.geminiKey || !profile) return;
+    if (dailyQuests.length > 0) return; // Already have quests for today
+    if (autoGenerating) return;
+
+    const doAutoGenerate = async () => {
+      setAutoGenerating(true);
+      try {
+        const activeArcs = questArcs.filter(a => a.status === 'active');
+        const activeSides = sideQuests.filter(q => q.status === 'active');
+        const weekAgo = new Date(); weekAgo.setDate(weekAgo.getDate() - 7);
+        const recentCompletions = recentLog.filter(l => new Date(l.completedAt) > weekAgo);
+
+        const quests = await generateDailyQuests(settings.geminiKey, {
+          activeArcs,
+          activeSideQuests: activeSides,
+          recentCompletions,
+          profile,
+        });
+        await bulkAddDailyQuests(quests);
+        const updated = await getTodayQuests();
+        setDailyQuests(updated);
+      } catch (err) {
+        console.error('Auto daily generation failed:', err);
+      }
+      setAutoGenerating(false);
+    };
+
+    doAutoGenerate();
+  }, [loading, settings, profile, dailyQuests.length, autoGenerating, questArcs, sideQuests, recentLog]);
 
   // --- Actions ---
 
@@ -72,6 +124,54 @@ export function GameProvider({ children }) {
     setDailyQuests(updated);
   };
 
+  // --- Streak Logic ---
+  const updateStreak = async () => {
+    const today = new Date().toISOString().split('T')[0];
+    const todayQuests = await getTodayQuests();
+    const allDone = todayQuests.length > 0 && todayQuests.every(q => q.status === 'completed');
+
+    if (!allDone) return;
+
+    const lastDate = profile.lastCompletedDate || '';
+    const currentStreak = profile.currentStreak || 0;
+    const longestStreak = profile.longestStreak || 0;
+
+    // Calculate yesterday's date
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    const yesterdayStr = yesterday.toISOString().split('T')[0];
+
+    let newStreak;
+    if (lastDate === yesterdayStr) {
+      newStreak = currentStreak + 1; // Consecutive day
+    } else if (lastDate === today) {
+      newStreak = currentStreak; // Already counted today
+    } else {
+      newStreak = 1; // Streak broken, start fresh
+    }
+
+    const newLongest = Math.max(longestStreak, newStreak);
+    // Streak bonus: +5 XP per streak day (capped at +50)
+    const streakBonus = Math.min(newStreak * 5, 50);
+
+    await dbUpdateProfile({
+      currentStreak: newStreak,
+      longestStreak: newLongest,
+      lastCompletedDate: today,
+      xp: (profile.xp || 0) + streakBonus,
+    });
+
+    setProfile(prev => ({
+      ...prev,
+      currentStreak: newStreak,
+      longestStreak: newLongest,
+      lastCompletedDate: today,
+      xp: (prev.xp || 0) + streakBonus,
+    }));
+
+    return { streakBonus, newStreak };
+  };
+
   const completeDaily = async (questId) => {
     const quest = dailyQuests.find(q => q.id === questId);
     if (!quest || quest.status === 'completed') return;
@@ -92,6 +192,13 @@ export function GameProvider({ children }) {
     await dbUpdateProfile({ level: result.newLevel, xp: result.newXp, ...statUpdates });
 
     await loadAll();
+
+    // Check if all dailies are now done → update streak
+    const updatedDaily = await getTodayQuests();
+    if (updatedDaily.every(q => q.status === 'completed')) {
+      await updateStreak();
+    }
+
     return result;
   };
 
@@ -148,14 +255,55 @@ export function GameProvider({ children }) {
     return result;
   };
 
+  // --- Chat ---
+  const sendChatMessage = async (content) => {
+    await addChatMessage('user', content);
+    setChatMessages(prev => [...prev, { role: 'user', content, createdAt: new Date().toISOString() }]);
+  };
+
+  const addArchitectReply = async (content) => {
+    await addChatMessage('architect', content);
+    setChatMessages(prev => [...prev, { role: 'architect', content, createdAt: new Date().toISOString() }]);
+  };
+
+  const resetChat = async () => {
+    await clearChat();
+    setChatMessages([]);
+  };
+
+  // --- Achievement Check ---
+  const runAchievementCheck = async () => {
+    if (!profile) return;
+    const newlyUnlocked = checkAchievements(profile, recentLog, unlockedAchievements);
+    if (newlyUnlocked.length > 0) {
+      const newIds = [...unlockedAchievements, ...newlyUnlocked.map(a => a.id)];
+      setUnlockedAchievements(newIds);
+      await dbUpdateProfile({ unlockedAchievements: newIds });
+      // Show toast for first new one
+      setToastMessage(`🏅 Achievement Unlocked: ${newlyUnlocked[0].title}`);
+      setTimeout(() => setToastMessage(null), 4000);
+    }
+  };
+
+  // Run achievement check whenever profile or log changes
+  useEffect(() => {
+    if (!loading && profile) {
+      runAchievementCheck();
+    }
+  }, [loading, profile?.level, profile?.healthStat, profile?.wealthStat, profile?.relationshipsStat, recentLog.length]);
+
   const value = {
     loading,
+    autoGenerating,
     profile,
     settings,
     questArcs,
     sideQuests,
     dailyQuests,
     recentLog,
+    chatMessages,
+    unlockedAchievements,
+    toastMessage,
     // Computed
     rank: profile ? getRank(profile.level) : 'Wanderer',
     requiredXp: profile ? getRequiredXp(profile.level) : 100,
@@ -168,7 +316,11 @@ export function GameProvider({ children }) {
     completeDaily,
     completeArcStep,
     completeSideQuest,
+    sendChatMessage,
+    addArchitectReply,
+    resetChat,
     loadAll,
+    setToastMessage,
   };
 
   return (

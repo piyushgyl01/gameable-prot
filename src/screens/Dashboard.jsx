@@ -4,7 +4,7 @@ import { generateDailyQuests } from '../lib/gemini';
 import { PILLARS } from '../lib/progression';
 
 export default function Dashboard() {
-  const { profile, settings, dailyQuests, questArcs, sideQuests, recentLog, rank, requiredXp, completeDaily, addDailyQuestsBatch } = useGame();
+  const { profile, settings, dailyQuests, questArcs, sideQuests, recentLog, rank, requiredXp, completeDaily, addDailyQuestsBatch, autoGenerating } = useGame();
   const [generating, setGenerating] = useState(false);
   const [genError, setGenError] = useState('');
 
@@ -47,14 +47,22 @@ export default function Dashboard() {
         <h1>Level {profile?.level || 1} · {rank}</h1>
       </div>
 
-      {/* XP Bar */}
-      <div style={{ marginBottom: 32 }}>
-        <div className="xp-bar">
-          <div className="xp-bar-fill" style={{ width: `${xpPct}%` }} />
+      {/* XP Bar + Streak */}
+      <div style={{ display: 'flex', gap: 24, alignItems: 'flex-end', marginBottom: 32 }}>
+        <div style={{ flex: 1 }}>
+          <div className="xp-bar">
+            <div className="xp-bar-fill" style={{ width: `${xpPct}%` }} />
+          </div>
+          <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 6 }} className="mono">
+            {profile?.xp || 0} / {requiredXp} XP
+          </div>
         </div>
-        <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 6 }} className="mono">
-          {profile?.xp || 0} / {requiredXp} XP
-        </div>
+        {(profile?.currentStreak || 0) > 0 && (
+          <div className="card" style={{ padding: '10px 16px', textAlign: 'center', minWidth: 80 }}>
+            <div className="mono" style={{ fontSize: 20, fontWeight: 800, color: 'var(--color-wealth)' }}>🔥 {profile.currentStreak}</div>
+            <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>day streak</div>
+          </div>
+        )}
       </div>
 
       {/* Today's Quests */}
@@ -74,10 +82,19 @@ export default function Dashboard() {
 
         {totalToday === 0 ? (
           <div className="card" style={{ padding: 32, textAlign: 'center' }}>
-            <p style={{ color: 'var(--text-secondary)', marginBottom: 16 }}>No quests for today yet.</p>
-            <button className="btn btn-primary" onClick={handleGenerateDaily} disabled={generating}>
-              {generating ? <><div className="spinner" style={{ width: 14, height: 14 }} /> Generating...</> : 'Generate Daily Quests'}
-            </button>
+            {autoGenerating ? (
+              <>
+                <div className="spinner" style={{ width: 24, height: 24, margin: '0 auto 12px' }} />
+                <p style={{ color: 'var(--text-secondary)' }}>The Architect is preparing today's quests...</p>
+              </>
+            ) : (
+              <>
+                <p style={{ color: 'var(--text-secondary)', marginBottom: 16 }}>No quests for today yet.</p>
+                <button className="btn btn-primary" onClick={handleGenerateDaily} disabled={generating}>
+                  {generating ? 'Generating...' : 'Generate Daily Quests'}
+                </button>
+              </>
+            )}
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>

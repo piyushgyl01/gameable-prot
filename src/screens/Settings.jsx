@@ -1,6 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { useGame } from '../context/GameContext';
 import { exportAllData, importAllData, clearAllData } from '../lib/db';
+import { THEMES, applyTheme } from '../lib/systems';
 
 export default function Settings() {
   const { settings, profile, updateSettings, updateProfileData, loadAll } = useGame();
@@ -80,6 +81,37 @@ export default function Settings() {
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <button className="btn btn-primary" onClick={handleSaveEndgame}>{endgameSaved ? 'Saved ✓' : 'Save'}</button>
           <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>Changing this won't erase your progress.</span>
+        </div>
+      </div>
+
+      {/* Theme */}
+      <div className="card" style={{ padding: 24, marginBottom: 20 }}>
+        <div className="label" style={{ marginBottom: 12 }}>Theme</div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8 }}>
+          {Object.entries(THEMES).map(([id, theme]) => {
+            const isActive = (settings?.theme || 'dark') === id;
+            return (
+              <button
+                key={id}
+                onClick={async () => {
+                  applyTheme(id);
+                  await updateSettings({ theme: id });
+                }}
+                style={{
+                  padding: '12px 8px', borderRadius: 8, cursor: 'pointer',
+                  background: theme.colors['--bg-surface'],
+                  border: `2px solid ${isActive ? theme.colors['--accent'] : theme.colors['--border']}`,
+                  color: theme.colors['--accent'],
+                  fontSize: 13, fontWeight: 600, textAlign: 'center',
+                  transition: 'all 150ms ease',
+                  outline: 'none',
+                }}
+              >
+                <div style={{ width: 20, height: 20, borderRadius: 10, background: theme.colors['--accent'], margin: '0 auto 6px' }} />
+                {theme.label}
+              </button>
+            );
+          })}
         </div>
       </div>
 

@@ -1,6 +1,7 @@
 import React from 'react';
 import { useGame } from '../context/GameContext';
 import { PILLARS } from '../lib/progression';
+import { ACHIEVEMENTS, SKILL_TREES } from '../lib/systems';
 
 const RANKS = [
   { minLevel: 1, title: 'Wanderer' },
@@ -15,8 +16,10 @@ const RANKS = [
   { minLevel: 100, title: 'Transcendent' },
 ];
 
+const STAT_KEYS = { health: 'healthStat', wealth: 'wealthStat', relationships: 'relationshipsStat' };
+
 export default function Character() {
-  const { profile, rank, requiredXp, recentLog } = useGame();
+  const { profile, rank, requiredXp, recentLog, unlockedAchievements } = useGame();
 
   if (!profile) return null;
 
@@ -57,6 +60,11 @@ export default function Character() {
             {profile.xp} / {requiredXp} XP
           </div>
         </div>
+        {(profile.currentStreak || 0) > 0 && (
+          <div style={{ marginTop: 12, fontSize: 13, color: 'var(--color-wealth)' }}>
+            🔥 {profile.currentStreak} day streak · Best: {profile.longestStreak || 0}
+          </div>
+        )}
       </div>
 
       {/* Core Pillars */}
@@ -69,10 +77,75 @@ export default function Character() {
               <div style={{ fontSize: 13, fontWeight: 600, color: s.color, marginBottom: 4 }}>{s.label}</div>
               <div className="mono" style={{ fontSize: 28, fontWeight: 800, color: s.color }}>{s.val}</div>
               <div className="progress-bar" style={{ marginTop: 12 }}>
-                <div className="progress-bar-fill" style={{ width: `${Math.min(100, s.val * 3)}%`, background: s.color }} />
+                <div className="progress-bar-fill" style={{ width: `${Math.min(100, s.val * 2.5)}%`, background: s.color }} />
               </div>
             </div>
           ))}
+        </div>
+      </div>
+
+      {/* Skill Trees */}
+      <div style={{ marginBottom: 32 }}>
+        <div className="section-title" style={{ marginBottom: 12 }}>Skill Trees</div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
+          {Object.entries(SKILL_TREES).map(([pillarKey, tree]) => {
+            const statVal = profile[STAT_KEYS[pillarKey]] || 0;
+            return (
+              <div key={pillarKey} className="card" style={{ padding: 20 }}>
+                <div style={{ fontSize: 14, fontWeight: 700, color: tree.color, marginBottom: 16 }}>{tree.label}</div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {tree.nodes.map(node => {
+                    const unlocked = statVal >= node.reqStat;
+                    return (
+                      <div key={node.id} style={{
+                        display: 'flex', alignItems: 'center', gap: 10,
+                        opacity: unlocked ? 1 : 0.35,
+                      }}>
+                        <div style={{
+                          width: 28, height: 28, borderRadius: 6,
+                          background: unlocked ? tree.color : 'var(--bg-base)',
+                          border: `2px solid ${unlocked ? tree.color : 'var(--border)'}`,
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          fontSize: 12, color: unlocked ? '#fff' : 'var(--text-muted)',
+                          fontWeight: 700, flexShrink: 0,
+                        }}>
+                          {unlocked ? '✓' : node.reqStat}
+                        </div>
+                        <div>
+                          <div style={{ fontSize: 12, fontWeight: 600 }}>{node.title}</div>
+                          <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{node.desc}</div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Achievements */}
+      <div style={{ marginBottom: 32 }}>
+        <div className="section-title" style={{ marginBottom: 12 }}>
+          Achievements ({unlockedAchievements.length}/{ACHIEVEMENTS.length})
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 8 }}>
+          {ACHIEVEMENTS.map(ach => {
+            const unlocked = unlockedAchievements.includes(ach.id);
+            return (
+              <div key={ach.id} className="card" style={{
+                padding: '12px 14px', display: 'flex', alignItems: 'center', gap: 10,
+                opacity: unlocked ? 1 : 0.3,
+              }}>
+                <div style={{ fontSize: 22, flexShrink: 0 }}>{ach.icon}</div>
+                <div>
+                  <div style={{ fontSize: 12, fontWeight: 600 }}>{ach.title}</div>
+                  <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{ach.desc}</div>
+                </div>
+              </div>
+            );
+          })}
         </div>
       </div>
 

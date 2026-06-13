@@ -9,6 +9,7 @@ db.version(1).stores({
   dailyQuests: '++id, pillar, date, status, sourceArcId',
   questLog: '++id, questId, questType, completedAt, pillar',
   settings: 'id',
+  chatMessages: '++id, role, createdAt',
 });
 
 // --- Profile ---
@@ -150,6 +151,24 @@ export async function getRecentLog(limit = 20) {
   return await db.questLog.reverse().limit(limit).toArray();
 }
 
+// --- Chat Messages ---
+
+export async function getChatMessages() {
+  return await db.chatMessages.toArray();
+}
+
+export async function addChatMessage(role, content) {
+  return await db.chatMessages.add({
+    role,
+    content,
+    createdAt: new Date().toISOString(),
+  });
+}
+
+export async function clearChat() {
+  return await db.chatMessages.clear();
+}
+
 // --- Export / Import ---
 
 export async function exportAllData() {
@@ -159,45 +178,50 @@ export async function exportAllData() {
   const sideQuests = await db.sideQuests.toArray();
   const dailyQuests = await db.dailyQuests.toArray();
   const questLog = await db.questLog.toArray();
+  const chatMessages = await db.chatMessages.toArray();
 
   return {
     version: 1,
     exportedAt: new Date().toISOString(),
     profile,
-    settings: { ...settings, geminiKey: '' }, // Don't export API key
+    settings: { ...settings, geminiKey: '' },
     questArcs,
     sideQuests,
     dailyQuests,
     questLog,
+    chatMessages,
   };
 }
 
 export async function importAllData(data) {
   if (data.version !== 1) throw new Error('Incompatible data version.');
 
-  await db.transaction('rw', db.profile, db.settings, db.questArcs, db.sideQuests, db.dailyQuests, db.questLog, async () => {
+  await db.transaction('rw', db.profile, db.settings, db.questArcs, db.sideQuests, db.dailyQuests, db.questLog, db.chatMessages, async () => {
     await db.profile.clear();
     await db.questArcs.clear();
     await db.sideQuests.clear();
     await db.dailyQuests.clear();
     await db.questLog.clear();
+    await db.chatMessages.clear();
 
     if (data.profile) await db.profile.put(data.profile);
     if (data.questArcs) await db.questArcs.bulkPut(data.questArcs);
     if (data.sideQuests) await db.sideQuests.bulkPut(data.sideQuests);
     if (data.dailyQuests) await db.dailyQuests.bulkPut(data.dailyQuests);
     if (data.questLog) await db.questLog.bulkPut(data.questLog);
+    if (data.chatMessages) await db.chatMessages.bulkPut(data.chatMessages);
   });
 }
 
 export async function clearAllData() {
-  await db.transaction('rw', db.profile, db.settings, db.questArcs, db.sideQuests, db.dailyQuests, db.questLog, async () => {
+  await db.transaction('rw', db.profile, db.settings, db.questArcs, db.sideQuests, db.dailyQuests, db.questLog, db.chatMessages, async () => {
     await db.profile.clear();
     await db.settings.clear();
     await db.questArcs.clear();
     await db.sideQuests.clear();
     await db.dailyQuests.clear();
     await db.questLog.clear();
+    await db.chatMessages.clear();
   });
 }
 
