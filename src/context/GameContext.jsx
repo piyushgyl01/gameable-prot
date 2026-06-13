@@ -5,9 +5,9 @@ import {
   getQuestArcs, getActiveSideQuests, getTodayQuests,
   addToQuestLog, updateDailyQuest, updateQuestArc, updateSideQuest, addQuestArc,
   bulkAddArcs, bulkAddSideQuests, bulkAddDailyQuests,
-  getRecentLog, getChatMessages, addChatMessage, clearChat,
+  getRecentLog, getChatMessages, addChatMessage, clearChat, removeQuestLogEntryByQuestId,
 } from '../lib/db';
-import { processQuestCompletion, getRequiredXp, getRank } from '../lib/progression';
+import { processQuestCompletion, processQuestReversion, getRequiredXp, getRank } from '../lib/progression';
 import { generateDailyQuests, generateNextStoryArc } from '../lib/gemini';
 import { checkAchievements, applyTheme } from '../lib/systems';
 
@@ -219,6 +219,47 @@ export function GameProvider({ children }) {
     return result;
   };
 
+  const uncompleteDaily = async (questId) => {
+    const quest = dailyQuests.find(q => q.id === questId);
+    if (!quest || quest.status !== 'completed') return;
+
+    // 1. Revert quest status
+    await updateDailyQuest(questId, { status: 'active' });
+
+    // 2. Remove from quest log
+    await removeQuestLogEntryByQuestId(questId);
+
+    // 3. Revert XP and stats
+    const result = processQuestReversion('daily', quest.pillar, profile.level, profile.xp);
+    const statUpdates = {};
+    for (const [key, val] of Object.entries(result.statGains)) {
+      statUpdates[key] = Math.max(0, (profile[key] || 0) - val); // Don't drop below 0
+    }
+
+    // Streak logic check: If reverting this means today isn't fully complete anymore,
+    // we don't automatically break their streak, but we might remove today's lastCompletedDate 
+    // so they have to earn it again.
+    const today = new Date().toISOString().split('T')[0];
+    const streakUpdates = {};
+    if (profile.lastCompletedDate === today) {
+      // Revert streak by 1 and remove lastCompletedDate since today is no longer fully complete
+      streakUpdates.currentStreak = Math.max(0, (profile.currentStreak || 1) - 1);
+      streakUpdates.lastCompletedDate = null; // Forces them to re-earn today's streak
+      // Subtract the streak bonus XP (5 XP per streak day, max 50)
+      const removedStreakBonus = Math.min((profile.currentStreak || 1) * 5, 50);
+      result.newXp = Math.max(0, result.newXp - removedStreakBonus);
+      if (result.newXp === 0 && result.newLevel > 1) {
+        // Handle possible de-leveling from streak bonus loss
+        result.newLevel--;
+        result.newXp += getRequiredXp(result.newLevel);
+      }
+    }
+
+    await dbUpdateProfile({ level: result.newLevel, xp: result.newXp, ...statUpdates, ...streakUpdates });
+    await loadAll();
+    return result;
+  };
+
   const completeArcStep = async (arcId, stepIndex) => {
     const arc = questArcs.find(a => a.id === arcId);
     if (!arc) return;
@@ -353,6 +394,7 @@ export function GameProvider({ children }) {
     finishOnboarding,
     addDailyQuestsBatch,
     completeDaily,
+    uncompleteDaily,
     completeArcStep,
     completeSideQuest,
     sendChatMessage,

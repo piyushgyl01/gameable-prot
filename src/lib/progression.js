@@ -42,6 +42,31 @@ export function processQuestCompletion(questType, pillar, currentLevel, currentX
   };
 }
 
+export function processQuestReversion(questType, pillar, currentLevel, currentXp) {
+  const xpGain = XP_REWARDS[questType] || 20;
+  let newXp = currentXp - xpGain;
+  let newLevel = currentLevel;
+
+  while (newXp < 0 && newLevel > 1) {
+    newLevel--;
+    newXp += getRequiredXp(newLevel);
+  }
+  
+  // If they drop below 0 XP on level 1, clamp to 0
+  if (newXp < 0) newXp = 0;
+
+  const statGains = {}; // these will be subtracted
+  if (pillar === 'health') statGains.healthStat = 1;
+  if (pillar === 'wealth') statGains.wealthStat = 1;
+  if (pillar === 'relationships') statGains.relationshipsStat = 1;
+
+  return {
+    newXp,
+    newLevel,
+    statGains,
+  };
+}
+
 // --- Rank / Title System ---
 
 const RANKS = [

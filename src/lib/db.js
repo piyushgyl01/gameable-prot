@@ -151,6 +151,13 @@ export async function getRecentLog(limit = 20) {
   return await db.questLog.reverse().limit(limit).toArray();
 }
 
+export async function removeQuestLogEntryByQuestId(questId) {
+  const entry = await db.questLog.where('questId').equals(questId).first();
+  if (entry) {
+    await db.questLog.delete(entry.id);
+  }
+}
+
 // --- Chat Messages ---
 
 export async function getChatMessages() {

@@ -4,7 +4,7 @@ import { generateDailyQuests } from '../lib/gemini';
 import { PILLARS } from '../lib/progression';
 
 export default function Dashboard() {
-  const { profile, settings, dailyQuests, questArcs, sideQuests, recentLog, rank, requiredXp, completeDaily, addDailyQuestsBatch, autoGenerating } = useGame();
+  const { profile, settings, dailyQuests, questArcs, sideQuests, recentLog, rank, requiredXp, completeDaily, uncompleteDaily, addDailyQuestsBatch, autoGenerating } = useGame();
   const [generating, setGenerating] = useState(false);
   const [genError, setGenError] = useState('');
 
@@ -98,25 +98,42 @@ export default function Dashboard() {
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {dailyQuests.map(q => {
-              const done = q.status === 'completed';
-              const pillar = PILLARS[q.pillar] || {};
+            {dailyQuests.filter(q => q.status !== 'completed').map(q => {
               return (
-                <div key={q.id} className="card" style={{ padding: '14px 18px', display: 'flex', alignItems: 'center', gap: 14, opacity: done ? 0.5 : 1 }}>
+                <div key={q.id} className="card" style={{ padding: '14px 18px', display: 'flex', alignItems: 'center', gap: 14 }}>
                   <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: 14, fontWeight: 600, textDecoration: done ? 'line-through' : 'none' }}>{q.title}</div>
+                    <div style={{ fontSize: 14, fontWeight: 600 }}>{q.title}</div>
                     {q.desc && <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>{q.desc}</div>}
                   </div>
                   <span className={`badge badge-${q.pillar}`}>{q.pillar}</span>
                   <span className="mono" style={{ fontSize: 12, color: 'var(--text-muted)', minWidth: 44, textAlign: 'right' }}>+{q.xpReward || 20}</span>
-                  {!done ? (
-                    <button className="btn btn-primary btn-sm" onClick={() => completeDaily(q.id)}>Done</button>
-                  ) : (
-                    <span style={{ color: 'var(--accent)', fontSize: 16 }}>✓</span>
-                  )}
+                  <button className="btn btn-primary btn-sm" onClick={() => completeDaily(q.id)}>Done</button>
                 </div>
               );
             })}
+            
+            {completedToday > 0 && (
+              <details style={{ marginTop: 16 }}>
+                <summary style={{ cursor: 'pointer', fontSize: 13, color: 'var(--text-muted)', padding: '8px 0', userSelect: 'none' }}>
+                  Show completed ({completedToday})
+                </summary>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 8 }}>
+                  {dailyQuests.filter(q => q.status === 'completed').map(q => {
+                    return (
+                      <div key={q.id} className="card" style={{ padding: '14px 18px', display: 'flex', alignItems: 'center', gap: 14, opacity: 0.7 }}>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontSize: 14, fontWeight: 600, textDecoration: 'line-through' }}>{q.title}</div>
+                          {q.desc && <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>{q.desc}</div>}
+                        </div>
+                        <span className={`badge badge-${q.pillar}`}>{q.pillar}</span>
+                        <span className="mono" style={{ fontSize: 12, color: 'var(--text-muted)', minWidth: 44, textAlign: 'right' }}>+{q.xpReward || 20}</span>
+                        <button className="btn btn-secondary btn-sm" onClick={() => uncompleteDaily(q.id)} style={{ padding: '4px 8px', fontSize: 12 }}>Undo</button>
+                      </div>
+                    );
+                  })}
+                </div>
+              </details>
+            )}
           </div>
         )}
       </div>
