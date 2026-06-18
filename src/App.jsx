@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, Component } from 'react';
 import { useGame } from './context/GameContext';
 import Onboarding from './screens/Onboarding';
 import Dashboard from './screens/Dashboard';
@@ -7,7 +7,40 @@ import Character from './screens/Character';
 import Chat from './screens/Chat';
 import Settings from './screens/Settings';
 
-// Simple SVG icons
+// --- Error Boundary ---
+class ErrorBoundary extends Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="error-boundary">
+          <div>
+            <div style={{ fontSize: 48, marginBottom: 16 }}>⚠️</div>
+            <h1>Something went wrong</h1>
+            <p>The app hit an unexpected error. Your data is safe in your browser.</p>
+            <button
+              className="btn btn-primary"
+              onClick={() => window.location.reload()}
+            >
+              Reload App
+            </button>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+// --- SVG Icons ---
 const Icons = {
   home: (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -79,8 +112,32 @@ function Sidebar({ activeScreen, setActiveScreen, profile, rank }) {
   );
 }
 
+// --- Achievement Toast ---
+function AchievementToast({ message, onDone }) {
+  const [exiting, setExiting] = useState(false);
+
+  React.useEffect(() => {
+    const timer = setTimeout(() => {
+      setExiting(true);
+      setTimeout(onDone, 300);
+    }, 3000);
+    return () => clearTimeout(timer);
+  }, [onDone]);
+
+  return (
+    <div className={`xp-toast ${exiting ? 'exiting' : ''}`}>
+      <div className="xp-toast-inner">
+        <div className="xp-toast-icon">🏆</div>
+        <div>
+          <div className="xp-toast-text">{message}</div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function AppContent() {
-  const { loading, settings, profile, rank, toastMessage } = useGame();
+  const { loading, settings, profile, rank, toastMessage, clearToast } = useGame();
   const [activeScreen, setActiveScreen] = useState('dashboard');
 
   if (loading) {
@@ -112,26 +169,25 @@ function AppContent() {
         profile={profile}
         rank={rank}
       />
-      <div className="main-content">
+      <div className="main-content" key={activeScreen}>
         {screens[activeScreen] || <Dashboard />}
       </div>
 
       {/* Achievement Toast */}
       {toastMessage && (
-        <div style={{
-          position: 'fixed', bottom: 24, right: 24, zIndex: 1000,
-          background: 'var(--bg-elevated)', border: '1px solid var(--accent)',
-          borderRadius: 12, padding: '14px 20px', fontSize: 14, fontWeight: 600,
-          color: 'var(--accent)', boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
-          animation: 'fadeIn 0.3s ease-out',
-        }}>
-          {toastMessage}
-        </div>
+        <AchievementToast
+          message={toastMessage}
+          onDone={clearToast || (() => {})}
+        />
       )}
     </div>
   );
 }
 
 export default function App() {
-  return <AppContent />;
+  return (
+    <ErrorBoundary>
+      <AppContent />
+    </ErrorBoundary>
+  );
 }

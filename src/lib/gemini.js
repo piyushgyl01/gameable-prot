@@ -104,33 +104,34 @@ function parseJSON(text) {
 export async function generateOnboardingQuests(apiKey, profileData) {
   const { name, endgame, current, healthNotes, wealthNotes, relationshipsNotes } = profileData;
 
-  const prompt = `You are an expert life-coach AI. A user named "${name || 'User'}" wants to transform their life.
+  const prompt = `A user wants to build better habits and reach their goals. Create a practical action plan for them.
 
-Their ultimate endgame: "${endgame}"
-Their current position: "${current}"
+Name: ${name || 'User'}
+Where they are now: "${current || 'Not specified'}"
+Where they want to be: "${endgame || 'Not specified'}"
 
-Their self-assessment by pillar:
-- Health: ${healthNotes || 'No details provided'}
-- Wealth: ${wealthNotes || 'No details provided'}
-- Relationships: ${relationshipsNotes || 'No details provided'}
+Their breakdown by area:
+- Health: ${healthNotes || 'Not specified'}
+- Wealth: ${wealthNotes || 'Not specified'}
+- Relationships: ${relationshipsNotes || 'Not specified'}
 
-Generate a structured quest plan. Return a JSON object with two arrays:
+Return a JSON object with:
 
 {
   "storyArcs": [
     {
-      "title": "string - short arc name",
-      "desc": "string - what this arc achieves",
+      "title": "short name",
+      "desc": "one line on what this achieves",
       "pillar": "health" | "wealth" | "relationships",
       "steps": [
-        { "title": "string - step name", "desc": "string - concrete action", "done": false }
+        { "title": "step name", "desc": "what to actually do", "done": false }
       ]
     }
   ],
   "sideQuests": [
     {
-      "title": "string - short quest name",
-      "desc": "string - what to do",
+      "title": "short name",
+      "desc": "what to do",
       "pillar": "health" | "wealth" | "relationships",
       "frequency": "daily" | "weekly"
     }
@@ -138,11 +139,12 @@ Generate a structured quest plan. Return a JSON object with two arrays:
 }
 
 Rules:
-- Generate 2-4 Story Arcs. Each arc should have 3-6 ordered steps. Arcs should span weeks to months.
-- Generate 3-5 Side Quests. These are recurring habits independent of the main quest.
-- Distribute across all three pillars.
-- Be specific and actionable, not generic. Base them on the user's actual situation.
-- Respond ONLY with the JSON object. No other text.`;
+- 2-4 story arcs with 3-6 steps each. These are multi-week projects, not vague aspirations.
+- 3-5 side quests. These are small recurring habits (e.g. "30 min walk", "read 20 pages", "message a friend").
+- Cover all three pillars.
+- Be specific to their situation. No generic self-help fluff.
+- Keep titles short (3-5 words). Keep descriptions to one sentence.
+- Respond ONLY with the JSON. No commentary.`;
 
   const text = await callGemini(apiKey, prompt);
   return parseJSON(text);
@@ -153,34 +155,36 @@ Rules:
 export async function generateDailyQuests(apiKey, context) {
   const { activeArcs, activeSideQuests, recentCompletions, profile } = context;
 
-  const prompt = `You are a life-coaching AI generating today's daily quests for a user.
+  const prompt = `Generate today's tasks for a user working on their goals.
 
-User's endgame: "${profile.endgame}"
-User's level: ${profile.level}
+Goal: "${profile.endgame}"
+Level: ${profile.level}
 
-Active Story Arcs:
+Their active projects:
 ${activeArcs.map(a => `- "${a.title}" (${a.pillar}): Next step: ${(a.steps.find(s => !s.done) || {}).title || 'All steps complete'}`).join('\n')}
 
-Active Side Quests:
+Their recurring habits:
 ${activeSideQuests.map(q => `- "${q.title}" (${q.pillar}, ${q.frequency})`).join('\n')}
 
-Recent completions (last 7 days): ${recentCompletions.length} quests completed.
+Completed ${recentCompletions.length} tasks in the last 7 days.
 
-Generate 3-7 concrete daily quests for today. Each quest should be completable in a single day.
-Some should advance story arc steps, some should be side quest instances, and some can be original.
+Generate 4-6 concrete tasks for today. Mix of:
+- Progress on active projects (advancing a specific step)
+- Recurring habit instances
+- One or two fresh tasks that fit their goals
 
 Return a JSON array:
 [
   {
-    "title": "string",
-    "desc": "string - brief actionable description",
+    "title": "short task name",
+    "desc": "one line on what to do",
     "pillar": "health" | "wealth" | "relationships",
     "xpReward": number (15-30),
-    "sourceArcId": number | null
+    "sourceArcId": null
   }
 ]
 
-Respond ONLY with the JSON array.`;
+Keep it practical. No motivational fluff. Respond ONLY with the JSON array.`;
 
   const text = await callGemini(apiKey, prompt);
   return parseJSON(text);

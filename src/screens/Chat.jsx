@@ -40,6 +40,8 @@ export default function Chat() {
     setSending(false);
   };
 
+  const suggestions = ['I got promoted!', "I'm feeling burnt out", 'Adjust my health quests', "What should I focus on?"];
+
   return (
     <div className="animate-in" style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 64px)' }}>
       {/* Header */}
@@ -58,17 +60,16 @@ export default function Chat() {
         {chatMessages.length === 0 && !sending && (
           <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <div style={{ textAlign: 'center', maxWidth: 360 }}>
-              <div style={{ fontSize: 40, marginBottom: 16 }}>🏛️</div>
+              <div className="animate-pop" style={{ fontSize: 40, marginBottom: 16 }}>🏛️</div>
               <p style={{ color: 'var(--text-secondary)', fontSize: 14, lineHeight: 1.6 }}>
                 The Architect awaits. Ask about your journey, report a life update, or request quest adjustments.
               </p>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 16, justifyContent: 'center' }}>
-                {['I got promoted!', "I'm feeling burnt out", 'Adjust my health quests', "What should I focus on?"].map(s => (
+                {suggestions.map((s, i) => (
                   <button
                     key={s}
-                    className="btn btn-sm"
+                    className={`suggestion-chip animate-slide-up stagger-${i + 1}`}
                     onClick={() => { setInput(s); }}
-                    style={{ fontSize: 12 }}
                   >
                     {s}
                   </button>
@@ -81,18 +82,23 @@ export default function Chat() {
         {chatMessages.map((msg, i) => {
           const isUser = msg.role === 'user';
           return (
-            <div key={i} style={{ display: 'flex', justifyContent: isUser ? 'flex-end' : 'flex-start' }}>
+            <div key={i} className="animate-slide-up" style={{ display: 'flex', justifyContent: isUser ? 'flex-end' : 'flex-start' }}>
               <div style={{
                 maxWidth: '70%',
                 padding: '12px 16px',
                 borderRadius: 12,
                 background: isUser ? 'var(--accent-dim)' : 'var(--bg-surface)',
                 border: `1px solid ${isUser ? 'rgba(16,185,129,0.2)' : 'var(--border)'}`,
+                borderLeft: !isUser ? '3px solid var(--accent)' : undefined,
                 fontSize: 14,
                 lineHeight: 1.6,
                 color: 'var(--text-primary)',
               }}>
-                {!isUser && <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 6, textTransform: 'uppercase', letterSpacing: 0.5 }}>The Architect</div>}
+                {!isUser && (
+                  <div className="mono" style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 6, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                    The Architect
+                  </div>
+                )}
                 <div style={{ whiteSpace: 'pre-wrap' }}>{msg.content}</div>
               </div>
             </div>
@@ -100,9 +106,15 @@ export default function Chat() {
         })}
 
         {sending && (
-          <div style={{ display: 'flex', justifyContent: 'flex-start' }}>
-            <div style={{ padding: '12px 16px', borderRadius: 12, background: 'var(--bg-surface)', border: '1px solid var(--border)' }}>
-              <div className="spinner" style={{ width: 16, height: 16 }} />
+          <div className="animate-slide-up" style={{ display: 'flex', justifyContent: 'flex-start' }}>
+            <div style={{
+              padding: '12px 16px',
+              borderRadius: 12,
+              background: 'var(--bg-surface)',
+              border: '1px solid var(--border)',
+              borderLeft: '3px solid var(--accent)',
+            }}>
+              <div className="typing-dots"><span></span><span></span><span></span></div>
             </div>
           </div>
         )}

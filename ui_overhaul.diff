@@ -1,0 +1,2273 @@
+diff --git a/dev-dist/sw.js b/dev-dist/sw.js
+index 0dc7f2e..aa0a311 100644
+--- a/dev-dist/sw.js
++++ b/dev-dist/sw.js
+@@ -81,7 +81,7 @@ define(['./workbox-7e5eb42b'], (function (workbox) { 'use strict';
+     "revision": "3ca0b8505b4bec776b69afdba2768812"
+   }, {
+     "url": "index.html",
+-    "revision": "0.glqtvh08avo"
++    "revision": "0.inqtibj75mg"
+   }], {});
+   workbox.cleanupOutdatedCaches();
+   workbox.registerRoute(new workbox.NavigationRoute(workbox.createHandlerBoundToURL("index.html"), {
+diff --git a/index.html b/index.html
+index 8b04bed..00dcefe 100644
+--- a/index.html
++++ b/index.html
+@@ -5,7 +5,6 @@
+     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+     <meta name="theme-color" content="#09090b" />
+-    <link rel="manifest" href="/manifest.json" />
+     <title>Gameable</title>
+   </head>
+   <body>
+diff --git a/src/App.jsx b/src/App.jsx
+index 08a7431..c2f7089 100644
+--- a/src/App.jsx
++++ b/src/App.jsx
+@@ -1,4 +1,4 @@
+-import React, { useState } from 'react';
++import React, { useState, Component } from 'react';
+ import { useGame } from './context/GameContext';
+ import Onboarding from './screens/Onboarding';
+ import Dashboard from './screens/Dashboard';
+@@ -7,7 +7,40 @@ import Character from './screens/Character';
+ import Chat from './screens/Chat';
+ import Settings from './screens/Settings';
+ 
+-// Simple SVG icons
++// --- Error Boundary ---
++class ErrorBoundary extends Component {
++  constructor(props) {
++    super(props);
++    this.state = { hasError: false, error: null };
++  }
++
++  static getDerivedStateFromError(error) {
++    return { hasError: true, error };
++  }
++
++  render() {
++    if (this.state.hasError) {
++      return (
++        <div className="error-boundary">
++          <div>
++            <div style={{ fontSize: 48, marginBottom: 16 }}>⚠️</div>
++            <h1>Something went wrong</h1>
++            <p>The app hit an unexpected error. Your data is safe in your browser.</p>
++            <button
++              className="btn btn-primary"
++              onClick={() => window.location.reload()}
++            >
++              Reload App
++            </button>
++          </div>
++        </div>
++      );
++    }
++    return this.props.children;
++  }
++}
++
++// --- SVG Icons ---
+ const Icons = {
+   home: (
+     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+@@ -79,8 +112,32 @@ function Sidebar({ activeScreen, setActiveScreen, profile, rank }) {
+   );
+ }
+ 
++// --- Achievement Toast ---
++function AchievementToast({ message, onDone }) {
++  const [exiting, setExiting] = useState(false);
++
++  React.useEffect(() => {
++    const timer = setTimeout(() => {
++      setExiting(true);
++      setTimeout(onDone, 300);
++    }, 3000);
++    return () => clearTimeout(timer);
++  }, [onDone]);
++
++  return (
++    <div className={`xp-toast ${exiting ? 'exiting' : ''}`}>
++      <div className="xp-toast-inner">
++        <div className="xp-toast-icon">🏆</div>
++        <div>
++          <div className="xp-toast-text">{message}</div>
++        </div>
++      </div>
++    </div>
++  );
++}
++
+ function AppContent() {
+-  const { loading, settings, profile, rank, toastMessage } = useGame();
++  const { loading, settings, profile, rank, toastMessage, clearToast } = useGame();
+   const [activeScreen, setActiveScreen] = useState('dashboard');
+ 
+   if (loading) {
+@@ -112,26 +169,25 @@ function AppContent() {
+         profile={profile}
+         rank={rank}
+       />
+-      <div className="main-content">
++      <div className="main-content" key={activeScreen}>
+         {screens[activeScreen] || <Dashboard />}
+       </div>
+ 
+       {/* Achievement Toast */}
+       {toastMessage && (
+-        <div style={{
+-          position: 'fixed', bottom: 24, right: 24, zIndex: 1000,
+-          background: 'var(--bg-elevated)', border: '1px solid var(--accent)',
+-          borderRadius: 12, padding: '14px 20px', fontSize: 14, fontWeight: 600,
+-          color: 'var(--accent)', boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
+-          animation: 'fadeIn 0.3s ease-out',
+-        }}>
+-          {toastMessage}
+-        </div>
++        <AchievementToast
++          message={toastMessage}
++          onDone={clearToast || (() => {})}
++        />
+       )}
+     </div>
+   );
+ }
+ 
+ export default function App() {
+-  return <AppContent />;
++  return (
++    <ErrorBoundary>
++      <AppContent />
++    </ErrorBoundary>
++  );
+ }
+diff --git a/src/index.css b/src/index.css
+index 00ba4f8..04a6ec7 100644
+--- a/src/index.css
++++ b/src/index.css
+@@ -41,7 +41,9 @@
+   --transition: 150ms ease;
+ }
+ 
+-/* --- Reset --- */
++/* =========================================
++   RESET
++   ========================================= */
+ 
+ *, *::before, *::after {
+   box-sizing: border-box;
+@@ -64,13 +66,130 @@ body {
+   display: flex;
+ }
+ 
+-/* --- Typography --- */
++/* =========================================
++   TYPOGRAPHY
++   ========================================= */
+ 
+ h1 { font-size: 24px; font-weight: 700; letter-spacing: -0.025em; }
+ h2 { font-size: 18px; font-weight: 700; letter-spacing: -0.02em; }
+ h3 { font-size: 14px; font-weight: 600; }
+ 
+-/* --- Layout --- */
++/* =========================================
++   KEYFRAME ANIMATIONS
++   ========================================= */
++
++@keyframes fadeIn {
++  from { opacity: 0; transform: translateY(4px); }
++  to { opacity: 1; transform: translateY(0); }
++}
++
++@keyframes slideUp {
++  from { opacity: 0; transform: translateY(16px); }
++  to { opacity: 1; transform: translateY(0); }
++}
++
++@keyframes slideInRight {
++  from { opacity: 0; transform: translateX(24px); }
++  to { opacity: 1; transform: translateX(0); }
++}
++
++@keyframes slideOutLeft {
++  from { opacity: 1; transform: translateX(0); }
++  to { opacity: 0; transform: translateX(-24px); }
++}
++
++@keyframes popIn {
++  0% { opacity: 0; transform: scale(0.5); }
++  70% { transform: scale(1.1); }
++  100% { opacity: 1; transform: scale(1); }
++}
++
++@keyframes shimmer {
++  0% { background-position: -200% 0; }
++  100% { background-position: 200% 0; }
++}
++
++@keyframes pulseGlow {
++  0%, 100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
++  50% { box-shadow: 0 0 20px 4px rgba(16, 185, 129, 0.3); }
++}
++
++@keyframes pulseAccent {
++  0%, 100% { opacity: 1; }
++  50% { opacity: 0.6; }
++}
++
++@keyframes floatUp {
++  0% { opacity: 1; transform: translateY(0); }
++  100% { opacity: 0; transform: translateY(-40px); }
++}
++
++@keyframes spin {
++  100% { transform: rotate(360deg); }
++}
++
++@keyframes checkBurst {
++  0% { transform: scale(0) rotate(-45deg); opacity: 0; }
++  50% { transform: scale(1.3) rotate(0deg); opacity: 1; }
++  100% { transform: scale(1) rotate(0deg); opacity: 1; }
++}
++
++@keyframes ringPulse {
++  0%, 100% { filter: drop-shadow(0 0 0 transparent); }
++  50% { filter: drop-shadow(0 0 12px rgba(16, 185, 129, 0.5)); }
++}
++
++@keyframes slideInUp {
++  from { opacity: 0; transform: translateY(20px); }
++  to { opacity: 1; transform: translateY(0); }
++}
++
++@keyframes toastIn {
++  0% { opacity: 0; transform: translateX(100%) translateY(20px); }
++  100% { opacity: 1; transform: translateX(0) translateY(0); }
++}
++
++@keyframes toastOut {
++  0% { opacity: 1; transform: translateX(0); }
++  100% { opacity: 0; transform: translateX(100%); }
++}
++
++@keyframes bounceIn {
++  0% { transform: scale(0); }
++  50% { transform: scale(1.15); }
++  70% { transform: scale(0.95); }
++  100% { transform: scale(1); }
++}
++
++@keyframes dotBounce {
++  0%, 80%, 100% { transform: translateY(0); }
++  40% { transform: translateY(-6px); }
++}
++
++@keyframes progressFill {
++  from { width: 0; }
++}
++
++@keyframes shimmerBar {
++  0% { left: -100%; }
++  100% { left: 200%; }
++}
++
++@keyframes levelUpFlash {
++  0% { opacity: 0; }
++  15% { opacity: 1; }
++  85% { opacity: 1; }
++  100% { opacity: 0; }
++}
++
++@keyframes shinePass {
++  0% { left: -100%; }
++  50%, 100% { left: 200%; }
++}
++
++/* =========================================
++   LAYOUT
++   ========================================= */
+ 
+ .app-layout {
+   display: flex;
+@@ -94,7 +213,9 @@ h3 { font-size: 14px; font-weight: 600; }
+   padding: 32px 40px;
+ }
+ 
+-/* --- Sidebar Components --- */
++/* =========================================
++   SIDEBAR
++   ========================================= */
+ 
+ .sidebar-profile {
+   padding: 0 8px;
+@@ -136,11 +257,13 @@ h3 { font-size: 14px; font-weight: 600; }
+   text-align: left;
+   outline: none;
+   width: 100%;
++  position: relative;
+ }
+ 
+ .sidebar-nav-item:hover {
+   background: var(--bg-hover);
+   color: var(--text-primary);
++  transform: translateX(2px);
+ }
+ 
+ .sidebar-nav-item.active {
+@@ -148,6 +271,17 @@ h3 { font-size: 14px; font-weight: 600; }
+   color: var(--text-primary);
+ }
+ 
++.sidebar-nav-item.active::before {
++  content: '';
++  position: absolute;
++  left: 0;
++  top: 6px;
++  bottom: 6px;
++  width: 3px;
++  background: var(--accent);
++  border-radius: 0 2px 2px 0;
++}
++
+ .sidebar-nav-item svg {
+   width: 16px;
+   height: 16px;
+@@ -159,20 +293,79 @@ h3 { font-size: 14px; font-weight: 600; }
+   margin-top: auto;
+ }
+ 
+-/* --- Cards --- */
++/* =========================================
++   CARDS
++   ========================================= */
+ 
+ .card {
+   background: var(--bg-surface);
+   border: 1px solid var(--border);
+   border-radius: var(--radius-lg);
+-  transition: border-color var(--transition);
++  transition: border-color var(--transition), transform var(--transition), box-shadow var(--transition);
+ }
+ 
+ .card:hover {
+   border-color: var(--border-hover);
+ }
+ 
+-/* --- Buttons --- */
++/* Quest card — interactive card with hover lift */
++.quest-card {
++  background: var(--bg-surface);
++  border: 1px solid var(--border);
++  border-radius: var(--radius-lg);
++  padding: 14px 18px;
++  display: flex;
++  align-items: center;
++  gap: 14px;
++  transition: all 200ms ease;
++  position: relative;
++  overflow: hidden;
++}
++
++.quest-card::before {
++  content: '';
++  position: absolute;
++  left: 0;
++  top: 0;
++  bottom: 0;
++  width: 3px;
++  border-radius: 12px 0 0 12px;
++  background: var(--quest-pillar-color, var(--border));
++  transition: width 200ms ease;
++}
++
++.quest-card:hover {
++  border-color: var(--border-hover);
++  transform: translateY(-1px);
++  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
++}
++
++.quest-card:hover::before {
++  width: 4px;
++}
++
++.quest-card.quest-health { --quest-pillar-color: var(--color-health); }
++.quest-card.quest-wealth { --quest-pillar-color: var(--color-wealth); }
++.quest-card.quest-relationships { --quest-pillar-color: var(--color-relationships); }
++
++/* Completed quest card */
++.quest-card.quest-completed {
++  opacity: 0.6;
++}
++
++.quest-card.quest-completed:hover {
++  transform: none;
++  box-shadow: none;
++}
++
++.quest-card.quest-completed .quest-title {
++  text-decoration: line-through;
++  color: var(--text-muted);
++}
++
++/* =========================================
++   BUTTONS
++   ========================================= */
+ 
+ .btn {
+   display: inline-flex;
+@@ -198,6 +391,10 @@ h3 { font-size: 14px; font-weight: 600; }
+   border-color: var(--border-hover);
+ }
+ 
++.btn:active:not(:disabled) {
++  transform: scale(0.97);
++}
++
+ .btn:disabled {
+   opacity: 0.4;
+   cursor: not-allowed;
+@@ -230,7 +427,30 @@ h3 { font-size: 14px; font-weight: 600; }
+   border-color: rgba(239, 68, 68, 0.3);
+ }
+ 
+-/* --- Inputs --- */
++/* Done button — satisfying press */
++.btn-done {
++  background: var(--accent);
++  border-color: var(--accent);
++  color: #fff;
++  padding: 5px 14px;
++  font-size: 12px;
++  border-radius: var(--radius-sm);
++  font-weight: 600;
++  transition: all 100ms ease;
++}
++
++.btn-done:hover:not(:disabled) {
++  background: var(--accent-hover);
++  transform: scale(1.05);
++}
++
++.btn-done:active:not(:disabled) {
++  transform: scale(0.9);
++}
++
++/* =========================================
++   INPUTS
++   ========================================= */
+ 
+ input[type="text"],
+ input[type="password"],
+@@ -244,14 +464,15 @@ textarea {
+   font-family: var(--font-main);
+   font-size: 14px;
+   outline: none;
+-  transition: border-color var(--transition);
++  transition: border-color var(--transition), box-shadow var(--transition);
+   resize: vertical;
+ }
+ 
+ input[type="text"]:focus,
+ input[type="password"]:focus,
+ textarea:focus {
+-  border-color: var(--border-focus);
++  border-color: var(--accent);
++  box-shadow: 0 0 0 3px var(--accent-dim);
+ }
+ 
+ input[type="text"]::placeholder,
+@@ -260,7 +481,9 @@ textarea::placeholder {
+   color: var(--text-muted);
+ }
+ 
+-/* --- Labels --- */
++/* =========================================
++   LABELS
++   ========================================= */
+ 
+ .label {
+   display: block;
+@@ -272,7 +495,9 @@ textarea::placeholder {
+   letter-spacing: 0.5px;
+ }
+ 
+-/* --- Badges --- */
++/* =========================================
++   BADGES
++   ========================================= */
+ 
+ .badge {
+   display: inline-flex;
+@@ -289,7 +514,42 @@ textarea::placeholder {
+ .badge-wealth { background: var(--color-wealth-dim); color: var(--color-wealth); }
+ .badge-relationships { background: var(--color-relationships-dim); color: var(--color-relationships); }
+ 
+-/* --- Progress Bar --- */
++/* =========================================
++   XP BAR
++   ========================================= */
++
++.xp-bar {
++  width: 100%;
++  height: 10px;
++  background: var(--bg-base);
++  border-radius: 5px;
++  overflow: hidden;
++  position: relative;
++}
++
++.xp-bar-fill {
++  height: 100%;
++  background: linear-gradient(90deg, var(--accent), #34d399);
++  border-radius: 5px;
++  transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1);
++  position: relative;
++}
++
++/* Shimmer effect on the XP bar */
++.xp-bar-fill::after {
++  content: '';
++  position: absolute;
++  top: 0;
++  left: -100%;
++  width: 50%;
++  height: 100%;
++  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.15), transparent);
++  animation: shimmerBar 3s ease-in-out infinite;
++}
++
++/* =========================================
++   PROGRESS BAR
++   ========================================= */
+ 
+ .progress-bar {
+   width: 100%;
+@@ -302,27 +562,153 @@ textarea::placeholder {
+ .progress-bar-fill {
+   height: 100%;
+   border-radius: 2px;
+-  transition: width 0.3s ease;
++  transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+ }
+ 
+-/* --- XP Bar (larger variant) --- */
++/* =========================================
++   DAILY GOAL RING
++   ========================================= */
+ 
+-.xp-bar {
+-  width: 100%;
+-  height: 8px;
+-  background: var(--bg-base);
+-  border-radius: 4px;
+-  overflow: hidden;
++.goal-ring-container {
++  position: relative;
++  display: inline-flex;
++  align-items: center;
++  justify-content: center;
+ }
+ 
+-.xp-bar-fill {
+-  height: 100%;
++.goal-ring-svg {
++  transform: rotate(-90deg);
++  transition: filter 0.3s ease;
++}
++
++.goal-ring-bg {
++  fill: none;
++  stroke: var(--bg-hover);
++  stroke-width: 4;
++}
++
++.goal-ring-fill {
++  fill: none;
++  stroke: var(--accent);
++  stroke-width: 4;
++  stroke-linecap: round;
++  transition: stroke-dashoffset 0.8s cubic-bezier(0.4, 0, 0.2, 1);
++}
++
++.goal-ring-complete .goal-ring-svg {
++  animation: ringPulse 2s ease-in-out infinite;
++}
++
++.goal-ring-complete .goal-ring-fill {
++  stroke: var(--accent);
++}
++
++.goal-ring-center {
++  position: absolute;
++  display: flex;
++  flex-direction: column;
++  align-items: center;
++  justify-content: center;
++}
++
++/* =========================================
++   XP TOAST (floating +XP)
++   ========================================= */
++
++.xp-toast {
++  position: fixed;
++  bottom: 24px;
++  right: 24px;
++  z-index: 1000;
++  animation: toastIn 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
++}
++
++.xp-toast.exiting {
++  animation: toastOut 0.3s ease-in forwards;
++}
++
++.xp-toast-inner {
++  display: flex;
++  align-items: center;
++  gap: 12px;
++  background: var(--bg-elevated);
++  border: 1px solid var(--accent);
++  border-radius: 12px;
++  padding: 14px 20px;
++  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(16, 185, 129, 0.1);
++}
++
++.xp-toast-icon {
++  font-size: 20px;
++  animation: bounceIn 0.5s ease forwards;
++}
++
++.xp-toast-text {
++  font-size: 14px;
++  font-weight: 600;
++  color: var(--accent);
++}
++
++.xp-toast-sub {
++  font-size: 12px;
++  color: var(--text-muted);
++  margin-top: 2px;
++}
++
++/* =========================================
++   LEVEL UP OVERLAY
++   ========================================= */
++
++.level-up-overlay {
++  position: fixed;
++  inset: 0;
++  z-index: 2000;
++  display: flex;
++  align-items: center;
++  justify-content: center;
++  background: rgba(0, 0, 0, 0.7);
++  animation: levelUpFlash 2.5s ease forwards;
++  pointer-events: none;
++}
++
++.level-up-content {
++  text-align: center;
++  animation: popIn 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
++}
++
++.level-up-content h1 {
++  font-size: 48px;
++  font-weight: 800;
++  color: var(--accent);
++  margin-bottom: 8px;
++}
++
++.level-up-content p {
++  font-size: 16px;
++  color: var(--text-secondary);
++}
++
++/* =========================================
++   CHECKMARK BURST
++   ========================================= */
++
++.check-burst {
++  display: inline-flex;
++  align-items: center;
++  justify-content: center;
++  width: 28px;
++  height: 28px;
++  border-radius: 50%;
+   background: var(--accent);
+-  border-radius: 4px;
+-  transition: width 0.4s ease;
++  color: #fff;
++  font-size: 14px;
++  font-weight: 700;
++  animation: checkBurst 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+ }
+ 
+-/* --- Stat Row --- */
++/* =========================================
++   STAT ROW
++   ========================================= */
+ 
+ .stat-row {
+   display: flex;
+@@ -341,7 +727,9 @@ textarea::placeholder {
+   font-size: 13px;
+ }
+ 
+-/* --- Section Header --- */
++/* =========================================
++   SECTION HEADER
++   ========================================= */
+ 
+ .section-header {
+   display: flex;
+@@ -358,21 +746,252 @@ textarea::placeholder {
+   letter-spacing: 0.5px;
+ }
+ 
+-/* --- Animations --- */
+-
+-@keyframes fadeIn {
+-  from { opacity: 0; transform: translateY(4px); }
+-  to { opacity: 1; transform: translateY(0); }
+-}
++/* =========================================
++   ANIMATIONS UTILITY CLASSES
++   ========================================= */
+ 
+ .animate-in {
+   animation: fadeIn 0.3s ease-out forwards;
+ }
+ 
+-@keyframes spin {
+-  100% { transform: rotate(360deg); }
++.animate-slide-up {
++  animation: slideUp 0.4s ease-out forwards;
++}
++
++.animate-slide-in {
++  animation: slideInRight 0.35s ease-out forwards;
++}
++
++.animate-pop {
++  animation: popIn 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
++}
++
++/* Staggered entry for lists */
++.stagger-1 { animation-delay: 0ms; }
++.stagger-2 { animation-delay: 50ms; }
++.stagger-3 { animation-delay: 100ms; }
++.stagger-4 { animation-delay: 150ms; }
++.stagger-5 { animation-delay: 200ms; }
++.stagger-6 { animation-delay: 250ms; }
++.stagger-7 { animation-delay: 300ms; }
++.stagger-8 { animation-delay: 350ms; }
++
++[class*="stagger-"] {
++  opacity: 0;
++  animation-fill-mode: forwards;
++}
++
++/* =========================================
++   TIMELINE (for story arc steps)
++   ========================================= */
++
++.timeline {
++  position: relative;
++  padding-left: 24px;
++}
++
++.timeline::before {
++  content: '';
++  position: absolute;
++  left: 8px;
++  top: 4px;
++  bottom: 4px;
++  width: 2px;
++  background: var(--border);
+ }
+ 
++.timeline-item {
++  position: relative;
++  padding: 8px 0;
++  display: flex;
++  align-items: flex-start;
++  gap: 10px;
++}
++
++.timeline-dot {
++  position: absolute;
++  left: -20px;
++  top: 12px;
++  width: 12px;
++  height: 12px;
++  border-radius: 50%;
++  border: 2px solid var(--border);
++  background: var(--bg-base);
++  z-index: 1;
++  transition: all 200ms ease;
++}
++
++.timeline-dot.done {
++  background: var(--accent);
++  border-color: var(--accent);
++}
++
++/* =========================================
++   TYPING INDICATOR (chat)
++   ========================================= */
++
++.typing-dots {
++  display: inline-flex;
++  gap: 4px;
++  padding: 4px 0;
++}
++
++.typing-dots span {
++  width: 6px;
++  height: 6px;
++  border-radius: 50%;
++  background: var(--text-muted);
++  animation: dotBounce 1.4s infinite ease-in-out;
++}
++
++.typing-dots span:nth-child(1) { animation-delay: 0ms; }
++.typing-dots span:nth-child(2) { animation-delay: 160ms; }
++.typing-dots span:nth-child(3) { animation-delay: 320ms; }
++
++/* =========================================
++   SUGGESTION CHIPS (chat)
++   ========================================= */
++
++.suggestion-chip {
++  display: inline-flex;
++  align-items: center;
++  padding: 6px 14px;
++  border-radius: 20px;
++  border: 1px solid var(--border);
++  background: var(--bg-elevated);
++  color: var(--text-secondary);
++  font-family: var(--font-main);
++  font-size: 12px;
++  font-weight: 500;
++  cursor: pointer;
++  transition: all 200ms ease;
++  outline: none;
++}
++
++.suggestion-chip:hover {
++  background: var(--bg-hover);
++  border-color: var(--accent);
++  color: var(--accent);
++  transform: translateY(-1px);
++  box-shadow: 0 2px 8px rgba(16, 185, 129, 0.15);
++}
++
++/* =========================================
++   ONBOARDING PROGRESS BAR
++   ========================================= */
++
++.onboarding-progress {
++  width: 100%;
++  height: 3px;
++  background: var(--bg-hover);
++  border-radius: 2px;
++  overflow: hidden;
++  margin-bottom: 24px;
++}
++
++.onboarding-progress-fill {
++  height: 100%;
++  background: var(--accent);
++  border-radius: 2px;
++  transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
++}
++
++/* =========================================
++   ACHIEVEMENT CARD
++   ========================================= */
++
++.achievement-card {
++  padding: 12px 14px;
++  display: flex;
++  align-items: center;
++  gap: 10px;
++  background: var(--bg-surface);
++  border: 1px solid var(--border);
++  border-radius: var(--radius-lg);
++  transition: all 200ms ease;
++}
++
++.achievement-card.unlocked {
++  position: relative;
++  overflow: hidden;
++}
++
++.achievement-card.unlocked::after {
++  content: '';
++  position: absolute;
++  top: 0;
++  left: -100%;
++  width: 50%;
++  height: 100%;
++  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.05), transparent);
++  animation: shinePass 4s ease-in-out infinite;
++}
++
++.achievement-card.locked {
++  opacity: 0.3;
++}
++
++.achievement-card.locked .achievement-icon {
++  filter: grayscale(100%);
++}
++
++/* =========================================
++   MAIN QUEST CARD (gradient border)
++   ========================================= */
++
++.main-quest-card {
++  background: var(--bg-surface);
++  border-radius: var(--radius-lg);
++  padding: 24px;
++  position: relative;
++  border: 1px solid transparent;
++  background-clip: padding-box;
++}
++
++.main-quest-card::before {
++  content: '';
++  position: absolute;
++  inset: -1px;
++  border-radius: var(--radius-lg);
++  background: linear-gradient(135deg, var(--color-health), var(--color-wealth), var(--color-relationships));
++  z-index: -1;
++  opacity: 0.5;
++  transition: opacity 300ms ease;
++}
++
++.main-quest-card:hover::before {
++  opacity: 0.8;
++}
++
++/* =========================================
++   ERROR BOUNDARY
++   ========================================= */
++
++.error-boundary {
++  display: flex;
++  align-items: center;
++  justify-content: center;
++  height: 100vh;
++  text-align: center;
++  padding: 40px;
++}
++
++.error-boundary h1 {
++  font-size: 20px;
++  margin-bottom: 8px;
++  color: var(--color-health);
++}
++
++.error-boundary p {
++  color: var(--text-secondary);
++  margin-bottom: 20px;
++  max-width: 400px;
++}
++
++/* =========================================
++   SPINNER
++   ========================================= */
++
+ .spinner {
+   width: 20px;
+   height: 20px;
+@@ -382,14 +1001,18 @@ textarea::placeholder {
+   animation: spin 0.8s linear infinite;
+ }
+ 
+-/* --- Scrollbar --- */
++/* =========================================
++   SCROLLBAR
++   ========================================= */
+ 
+ ::-webkit-scrollbar { width: 6px; }
+ ::-webkit-scrollbar-track { background: transparent; }
+ ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+ ::-webkit-scrollbar-thumb:hover { background: var(--border-hover); }
+ 
+-/* --- Utility --- */
++/* =========================================
++   UTILITIES
++   ========================================= */
+ 
+ .mono { font-family: var(--font-mono); }
+ .text-muted { color: var(--text-muted); }
+diff --git a/src/lib/gemini.js b/src/lib/gemini.js
+index 46aed49..fcf181c 100644
+--- a/src/lib/gemini.js
++++ b/src/lib/gemini.js
+@@ -104,33 +104,34 @@ function parseJSON(text) {
+ export async function generateOnboardingQuests(apiKey, profileData) {
+   const { name, endgame, current, healthNotes, wealthNotes, relationshipsNotes } = profileData;
+ 
+-  const prompt = `You are an expert life-coach AI. A user named "${name || 'User'}" wants to transform their life.
++  const prompt = `A user wants to build better habits and reach their goals. Create a practical action plan for them.
+ 
+-Their ultimate endgame: "${endgame}"
+-Their current position: "${current}"
++Name: ${name || 'User'}
++Where they are now: "${current || 'Not specified'}"
++Where they want to be: "${endgame || 'Not specified'}"
+ 
+-Their self-assessment by pillar:
+-- Health: ${healthNotes || 'No details provided'}
+-- Wealth: ${wealthNotes || 'No details provided'}
+-- Relationships: ${relationshipsNotes || 'No details provided'}
++Their breakdown by area:
++- Health: ${healthNotes || 'Not specified'}
++- Wealth: ${wealthNotes || 'Not specified'}
++- Relationships: ${relationshipsNotes || 'Not specified'}
+ 
+-Generate a structured quest plan. Return a JSON object with two arrays:
++Return a JSON object with:
+ 
+ {
+   "storyArcs": [
+     {
+-      "title": "string - short arc name",
+-      "desc": "string - what this arc achieves",
++      "title": "short name",
++      "desc": "one line on what this achieves",
+       "pillar": "health" | "wealth" | "relationships",
+       "steps": [
+-        { "title": "string - step name", "desc": "string - concrete action", "done": false }
++        { "title": "step name", "desc": "what to actually do", "done": false }
+       ]
+     }
+   ],
+   "sideQuests": [
+     {
+-      "title": "string - short quest name",
+-      "desc": "string - what to do",
++      "title": "short name",
++      "desc": "what to do",
+       "pillar": "health" | "wealth" | "relationships",
+       "frequency": "daily" | "weekly"
+     }
+@@ -138,11 +139,12 @@ Generate a structured quest plan. Return a JSON object with two arrays:
+ }
+ 
+ Rules:
+-- Generate 2-4 Story Arcs. Each arc should have 3-6 ordered steps. Arcs should span weeks to months.
+-- Generate 3-5 Side Quests. These are recurring habits independent of the main quest.
+-- Distribute across all three pillars.
+-- Be specific and actionable, not generic. Base them on the user's actual situation.
+-- Respond ONLY with the JSON object. No other text.`;
++- 2-4 story arcs with 3-6 steps each. These are multi-week projects, not vague aspirations.
++- 3-5 side quests. These are small recurring habits (e.g. "30 min walk", "read 20 pages", "message a friend").
++- Cover all three pillars.
++- Be specific to their situation. No generic self-help fluff.
++- Keep titles short (3-5 words). Keep descriptions to one sentence.
++- Respond ONLY with the JSON. No commentary.`;
+ 
+   const text = await callGemini(apiKey, prompt);
+   return parseJSON(text);
+@@ -153,34 +155,36 @@ Rules:
+ export async function generateDailyQuests(apiKey, context) {
+   const { activeArcs, activeSideQuests, recentCompletions, profile } = context;
+ 
+-  const prompt = `You are a life-coaching AI generating today's daily quests for a user.
++  const prompt = `Generate today's tasks for a user working on their goals.
+ 
+-User's endgame: "${profile.endgame}"
+-User's level: ${profile.level}
++Goal: "${profile.endgame}"
++Level: ${profile.level}
+ 
+-Active Story Arcs:
++Their active projects:
+ ${activeArcs.map(a => `- "${a.title}" (${a.pillar}): Next step: ${(a.steps.find(s => !s.done) || {}).title || 'All steps complete'}`).join('\n')}
+ 
+-Active Side Quests:
++Their recurring habits:
+ ${activeSideQuests.map(q => `- "${q.title}" (${q.pillar}, ${q.frequency})`).join('\n')}
+ 
+-Recent completions (last 7 days): ${recentCompletions.length} quests completed.
++Completed ${recentCompletions.length} tasks in the last 7 days.
+ 
+-Generate 3-7 concrete daily quests for today. Each quest should be completable in a single day.
+-Some should advance story arc steps, some should be side quest instances, and some can be original.
++Generate 4-6 concrete tasks for today. Mix of:
++- Progress on active projects (advancing a specific step)
++- Recurring habit instances
++- One or two fresh tasks that fit their goals
+ 
+ Return a JSON array:
+ [
+   {
+-    "title": "string",
+-    "desc": "string - brief actionable description",
++    "title": "short task name",
++    "desc": "one line on what to do",
+     "pillar": "health" | "wealth" | "relationships",
+     "xpReward": number (15-30),
+-    "sourceArcId": number | null
++    "sourceArcId": null
+   }
+ ]
+ 
+-Respond ONLY with the JSON array.`;
++Keep it practical. No motivational fluff. Respond ONLY with the JSON array.`;
+ 
+   const text = await callGemini(apiKey, prompt);
+   return parseJSON(text);
+diff --git a/src/screens/Character.jsx b/src/screens/Character.jsx
+index 7336cd9..3b29534 100644
+--- a/src/screens/Character.jsx
++++ b/src/screens/Character.jsx
+@@ -1,7 +1,8 @@
+-import React from 'react';
++import React, { useMemo } from 'react';
+ import { useGame } from '../context/GameContext';
+-import { PILLARS } from '../lib/progression';
++import { PILLARS, XP_REWARDS } from '../lib/progression';
+ import { ACHIEVEMENTS, SKILL_TREES } from '../lib/systems';
++import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
+ 
+ const RANKS = [
+   { minLevel: 1, title: 'Wanderer' },
+@@ -18,6 +19,94 @@ const RANKS = [
+ 
+ const STAT_KEYS = { health: 'healthStat', wealth: 'wealthStat', relationships: 'relationshipsStat' };
+ 
++/* ── SVG Semi-Circular Gauge ── */
++function SemiGauge({ value, max = 40, color, size = 120 }) {
++  const strokeWidth = 8;
++  const radius = (size - strokeWidth) / 2;
++  const cx = size / 2;
++  const cy = size / 2 + 10; // push center down so arc sits nicely
++
++  // Arc spans 180° (π radians), from left to right across the top
++  const startAngle = Math.PI;       // left
++  const endAngle = 0;               // right
++  const pct = Math.min(value / max, 1);
++  const sweepAngle = Math.PI * pct;
++
++  // Background arc path (full semi-circle)
++  const bgX1 = cx + radius * Math.cos(startAngle);
++  const bgY1 = cy - radius * Math.sin(startAngle);
++  const bgX2 = cx + radius * Math.cos(endAngle);
++  const bgY2 = cy - radius * Math.sin(endAngle);
++  const bgPath = `M ${bgX1} ${bgY1} A ${radius} ${radius} 0 1 1 ${bgX2} ${bgY2}`;
++
++  // Fill arc path
++  const fillEndAngle = startAngle - sweepAngle;
++  const fX2 = cx + radius * Math.cos(fillEndAngle);
++  const fY2 = cy - radius * Math.sin(fillEndAngle);
++  const largeArc = pct > 0.5 ? 1 : 0;
++  const fillPath = pct > 0
++    ? `M ${bgX1} ${bgY1} A ${radius} ${radius} 0 ${largeArc} 1 ${fX2} ${fY2}`
++    : '';
++
++  return (
++    <svg width={size} height={size / 2 + 20} viewBox={`0 0 ${size} ${size / 2 + 20}`} style={{ overflow: 'visible' }}>
++      {/* Background arc */}
++      <path
++        d={bgPath}
++        fill="none"
++        stroke="var(--bg-hover)"
++        strokeWidth={strokeWidth}
++        strokeLinecap="round"
++      />
++      {/* Filled arc */}
++      {pct > 0 && (
++        <path
++          d={fillPath}
++          fill="none"
++          stroke={color}
++          strokeWidth={strokeWidth}
++          strokeLinecap="round"
++          style={{
++            filter: `drop-shadow(0 0 6px ${color}40)`,
++          }}
++        />
++      )}
++      {/* Center value */}
++      <text
++        x={cx}
++        y={cy - 8}
++        textAnchor="middle"
++        dominantBaseline="central"
++        fill={color}
++        fontFamily="var(--font-mono)"
++        fontSize="22"
++        fontWeight="800"
++      >
++        {value}
++      </text>
++    </svg>
++  );
++}
++
++/* ── Custom Tooltip for Growth Chart ── */
++function ChartTooltip({ active, payload, label }) {
++  if (!active || !payload?.length) return null;
++  return (
++    <div style={{
++      background: 'var(--bg-elevated)',
++      border: '1px solid var(--border)',
++      borderRadius: 'var(--radius-md)',
++      padding: '8px 12px',
++      fontSize: 12,
++    }}>
++      <div style={{ color: 'var(--text-muted)', marginBottom: 2 }}>{label}</div>
++      <div className="mono" style={{ color: 'var(--accent)', fontWeight: 700 }}>
++        +{payload[0].value} XP
++      </div>
++    </div>
++  );
++}
++
+ export default function Character() {
+   const { profile, rank, requiredXp, recentLog, unlockedAchievements } = useGame();
+ 
+@@ -36,22 +125,58 @@ export default function Character() {
+     { key: 'relationships', val: profile.relationshipsStat || 0, ...PILLARS.relationships },
+   ];
+ 
++  /* ── Growth chart data: group XP by date ── */
++  const growthData = useMemo(() => {
++    const byDate = {};
++    for (const entry of recentLog) {
++      if (!entry.completedAt) continue;
++      const date = entry.completedAt.split('T')[0]; // 'YYYY-MM-DD'
++      const xp = entry.xpEarned || XP_REWARDS[entry.questType] || 20;
++      byDate[date] = (byDate[date] || 0) + xp;
++    }
++    return Object.entries(byDate)
++      .sort(([a], [b]) => a.localeCompare(b))
++      .map(([date, xp]) => ({
++        date: date.slice(5), // 'MM-DD'
++        xp,
++      }));
++  }, [recentLog]);
++
+   return (
+     <div className="animate-in">
+       <h1 style={{ marginBottom: 32 }}>Character</h1>
+ 
+-      {/* Character Card */}
+-      <div className="card" style={{ padding: 32, textAlign: 'center', marginBottom: 32 }}>
++      {/* ── Character Card ── */}
++      <div className="card animate-slide-up" style={{ padding: 32, textAlign: 'center', marginBottom: 32 }}>
++        {/* Avatar with gradient accent border */}
+         <div style={{
+-          width: 72, height: 72, borderRadius: 36, background: 'var(--bg-hover)', border: '2px solid var(--border)',
+-          display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 28, fontWeight: 800,
+-          margin: '0 auto 16px', color: 'var(--accent)',
++          width: 80, height: 80, borderRadius: '50%',
++          background: 'linear-gradient(135deg, var(--accent), #34d399)',
++          padding: 3, margin: '0 auto 16px',
+         }}>
+-          {initials}
++          <div style={{
++            width: '100%', height: '100%', borderRadius: '50%',
++            background: 'var(--bg-surface)',
++            display: 'flex', alignItems: 'center', justifyContent: 'center',
++            fontSize: 30, fontWeight: 800, color: 'var(--accent)',
++          }}>
++            {initials}
++          </div>
+         </div>
++
+         <div style={{ fontSize: 20, fontWeight: 700 }}>{profile.name}</div>
+         <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 4 }}>{rank}</div>
+-        <div style={{ fontSize: 28, fontWeight: 800, marginBottom: 12 }}>Level {profile.level}</div>
++
++        {/* Prominent level */}
++        <div className="mono" style={{
++          fontSize: 36, fontWeight: 800, marginBottom: 12,
++          background: 'linear-gradient(135deg, var(--accent), #34d399)',
++          WebkitBackgroundClip: 'text',
++          WebkitTextFillColor: 'transparent',
++        }}>
++          Level {profile.level}
++        </div>
++
+         <div style={{ maxWidth: 300, margin: '0 auto' }}>
+           <div className="xp-bar">
+             <div className="xp-bar-fill" style={{ width: `${xpPct}%` }} />
+@@ -60,6 +185,7 @@ export default function Character() {
+             {profile.xp} / {requiredXp} XP
+           </div>
+         </div>
++
+         {(profile.currentStreak || 0) > 0 && (
+           <div style={{ marginTop: 12, fontSize: 13, color: 'var(--color-wealth)' }}>
+             🔥 {profile.currentStreak} day streak · Best: {profile.longestStreak || 0}
+@@ -67,24 +193,59 @@ export default function Character() {
+         )}
+       </div>
+ 
+-      {/* Core Pillars */}
++      {/* ── Core Pillars — SVG Gauges ── */}
+       <div style={{ marginBottom: 32 }}>
+         <div className="section-title" style={{ marginBottom: 12 }}>Core Pillars</div>
+         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
+           {stats.map(s => (
+             <div key={s.key} className="card" style={{ padding: 20, textAlign: 'center' }}>
+-              <div style={{ fontSize: 24, marginBottom: 8 }}>{s.icon}</div>
+-              <div style={{ fontSize: 13, fontWeight: 600, color: s.color, marginBottom: 4 }}>{s.label}</div>
+-              <div className="mono" style={{ fontSize: 28, fontWeight: 800, color: s.color }}>{s.val}</div>
+-              <div className="progress-bar" style={{ marginTop: 12 }}>
+-                <div className="progress-bar-fill" style={{ width: `${Math.min(100, s.val * 2.5)}%`, background: s.color }} />
+-              </div>
++              <div style={{ fontSize: 24, marginBottom: 4 }}>{s.icon}</div>
++              <div style={{ fontSize: 13, fontWeight: 600, color: s.color, marginBottom: 8 }}>{s.label}</div>
++              <SemiGauge value={s.val} max={40} color={s.color} size={120} />
+             </div>
+           ))}
+         </div>
+       </div>
+ 
+-      {/* Skill Trees */}
++      {/* ── Growth Chart ── */}
++      {growthData.length > 1 && (
++        <div style={{ marginBottom: 32 }}>
++          <div className="section-title" style={{ marginBottom: 12 }}>Growth</div>
++          <div className="card" style={{ padding: '20px 20px 12px' }}>
++            <ResponsiveContainer width="100%" height={160}>
++              <AreaChart data={growthData} margin={{ top: 4, right: 8, bottom: 0, left: -20 }}>
++                <defs>
++                  <linearGradient id="xpGrad" x1="0" y1="0" x2="0" y2="1">
++                    <stop offset="0%" stopColor="var(--accent)" stopOpacity={0.25} />
++                    <stop offset="100%" stopColor="var(--accent)" stopOpacity={0.02} />
++                  </linearGradient>
++                </defs>
++                <XAxis
++                  dataKey="date"
++                  axisLine={false}
++                  tickLine={false}
++                  tick={{ fill: 'var(--text-muted)', fontSize: 11 }}
++                />
++                <YAxis
++                  axisLine={false}
++                  tickLine={false}
++                  tick={{ fill: 'var(--text-muted)', fontSize: 11 }}
++                />
++                <Tooltip content={<ChartTooltip />} />
++                <Area
++                  type="monotone"
++                  dataKey="xp"
++                  stroke="var(--accent)"
++                  strokeWidth={2}
++                  fill="url(#xpGrad)"
++                />
++              </AreaChart>
++            </ResponsiveContainer>
++          </div>
++        </div>
++      )}
++
++      {/* ── Skill Trees with connecting lines ── */}
+       <div style={{ marginBottom: 32 }}>
+         <div className="section-title" style={{ marginBottom: 12 }}>Skill Trees</div>
+         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
+@@ -93,14 +254,23 @@ export default function Character() {
+             return (
+               <div key={pillarKey} className="card" style={{ padding: 20 }}>
+                 <div style={{ fontSize: 14, fontWeight: 700, color: tree.color, marginBottom: 16 }}>{tree.label}</div>
+-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+-                  {tree.nodes.map(node => {
++                <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
++                  {tree.nodes.map((node, idx) => {
+                     const unlocked = statVal >= node.reqStat;
+                     return (
+-                      <div key={node.id} style={{
+-                        display: 'flex', alignItems: 'center', gap: 10,
+-                        opacity: unlocked ? 1 : 0.35,
+-                      }}>
++                      <div
++                        key={node.id}
++                        className={unlocked ? 'animate-pop' : ''}
++                        style={{
++                          display: 'flex', alignItems: 'center', gap: 10,
++                          opacity: unlocked ? 1 : 0.35,
++                          paddingLeft: idx > 0 ? 13 : 0,
++                          borderLeft: idx > 0 ? `2px solid ${unlocked ? tree.color : 'var(--border)'}` : 'none',
++                          paddingTop: 8,
++                          paddingBottom: 8,
++                          marginLeft: idx > 0 ? 0 : 13,
++                        }}
++                      >
+                         <div style={{
+                           width: 28, height: 28, borderRadius: 6,
+                           background: unlocked ? tree.color : 'var(--bg-base)',
+@@ -125,20 +295,20 @@ export default function Character() {
+         </div>
+       </div>
+ 
+-      {/* Achievements */}
++      {/* ── Achievements ── */}
+       <div style={{ marginBottom: 32 }}>
+         <div className="section-title" style={{ marginBottom: 12 }}>
+           Achievements ({unlockedAchievements.length}/{ACHIEVEMENTS.length})
+         </div>
+         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 8 }}>
+           {ACHIEVEMENTS.map(ach => {
+-            const unlocked = unlockedAchievements.includes(ach.id);
++            const isUnlocked = unlockedAchievements.includes(ach.id);
+             return (
+-              <div key={ach.id} className="card" style={{
+-                padding: '12px 14px', display: 'flex', alignItems: 'center', gap: 10,
+-                opacity: unlocked ? 1 : 0.3,
+-              }}>
+-                <div style={{ fontSize: 22, flexShrink: 0 }}>{ach.icon}</div>
++              <div
++                key={ach.id}
++                className={`achievement-card ${isUnlocked ? 'unlocked' : 'locked'}`}
++              >
++                <div className="achievement-icon" style={{ fontSize: 22, flexShrink: 0 }}>{ach.icon}</div>
+                 <div>
+                   <div style={{ fontSize: 12, fontWeight: 600 }}>{ach.title}</div>
+                   <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{ach.desc}</div>
+@@ -149,7 +319,7 @@ export default function Character() {
+         </div>
+       </div>
+ 
+-      {/* Quest Stats */}
++      {/* ── Quest Stats ── */}
+       <div style={{ marginBottom: 32 }}>
+         <div className="section-title" style={{ marginBottom: 12 }}>Quest Stats</div>
+         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
+@@ -159,7 +329,11 @@ export default function Character() {
+             { label: 'Side Quests', val: sideDone },
+             { label: 'Dailies', val: dailyDone },
+           ].map((s, i) => (
+-            <div key={i} className="card" style={{ padding: 16, textAlign: 'center' }}>
++            <div
++              key={i}
++              className={`card animate-slide-up stagger-${i + 1}`}
++              style={{ padding: 16, textAlign: 'center' }}
++            >
+               <div className="mono" style={{ fontSize: 24, fontWeight: 800, marginBottom: 4 }}>{s.val}</div>
+               <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{s.label}</div>
+             </div>
+@@ -167,8 +341,8 @@ export default function Character() {
+         </div>
+       </div>
+ 
+-      {/* Rank Progression */}
+-      <div>
++      {/* ── Rank Progression ── */}
++      <div className="animate-slide-up">
+         <div className="section-title" style={{ marginBottom: 12 }}>Rank Progression</div>
+         <div className="card" style={{ padding: 20 }}>
+           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+diff --git a/src/screens/Chat.jsx b/src/screens/Chat.jsx
+index dfa46ac..a63f534 100644
+--- a/src/screens/Chat.jsx
++++ b/src/screens/Chat.jsx
+@@ -40,6 +40,8 @@ export default function Chat() {
+     setSending(false);
+   };
+ 
++  const suggestions = ['I got promoted!', "I'm feeling burnt out", 'Adjust my health quests', "What should I focus on?"];
++
+   return (
+     <div className="animate-in" style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 64px)' }}>
+       {/* Header */}
+@@ -58,17 +60,16 @@ export default function Chat() {
+         {chatMessages.length === 0 && !sending && (
+           <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+             <div style={{ textAlign: 'center', maxWidth: 360 }}>
+-              <div style={{ fontSize: 40, marginBottom: 16 }}>🏛️</div>
++              <div className="animate-pop" style={{ fontSize: 40, marginBottom: 16 }}>🏛️</div>
+               <p style={{ color: 'var(--text-secondary)', fontSize: 14, lineHeight: 1.6 }}>
+                 The Architect awaits. Ask about your journey, report a life update, or request quest adjustments.
+               </p>
+               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 16, justifyContent: 'center' }}>
+-                {['I got promoted!', "I'm feeling burnt out", 'Adjust my health quests', "What should I focus on?"].map(s => (
++                {suggestions.map((s, i) => (
+                   <button
+                     key={s}
+-                    className="btn btn-sm"
++                    className={`suggestion-chip animate-slide-up stagger-${i + 1}`}
+                     onClick={() => { setInput(s); }}
+-                    style={{ fontSize: 12 }}
+                   >
+                     {s}
+                   </button>
+@@ -81,18 +82,23 @@ export default function Chat() {
+         {chatMessages.map((msg, i) => {
+           const isUser = msg.role === 'user';
+           return (
+-            <div key={i} style={{ display: 'flex', justifyContent: isUser ? 'flex-end' : 'flex-start' }}>
++            <div key={i} className="animate-slide-up" style={{ display: 'flex', justifyContent: isUser ? 'flex-end' : 'flex-start' }}>
+               <div style={{
+                 maxWidth: '70%',
+                 padding: '12px 16px',
+                 borderRadius: 12,
+                 background: isUser ? 'var(--accent-dim)' : 'var(--bg-surface)',
+                 border: `1px solid ${isUser ? 'rgba(16,185,129,0.2)' : 'var(--border)'}`,
++                borderLeft: !isUser ? '3px solid var(--accent)' : undefined,
+                 fontSize: 14,
+                 lineHeight: 1.6,
+                 color: 'var(--text-primary)',
+               }}>
+-                {!isUser && <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 6, textTransform: 'uppercase', letterSpacing: 0.5 }}>The Architect</div>}
++                {!isUser && (
++                  <div className="mono" style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 6, textTransform: 'uppercase', letterSpacing: 0.5 }}>
++                    The Architect
++                  </div>
++                )}
+                 <div style={{ whiteSpace: 'pre-wrap' }}>{msg.content}</div>
+               </div>
+             </div>
+@@ -100,9 +106,15 @@ export default function Chat() {
+         })}
+ 
+         {sending && (
+-          <div style={{ display: 'flex', justifyContent: 'flex-start' }}>
+-            <div style={{ padding: '12px 16px', borderRadius: 12, background: 'var(--bg-surface)', border: '1px solid var(--border)' }}>
+-              <div className="spinner" style={{ width: 16, height: 16 }} />
++          <div className="animate-slide-up" style={{ display: 'flex', justifyContent: 'flex-start' }}>
++            <div style={{
++              padding: '12px 16px',
++              borderRadius: 12,
++              background: 'var(--bg-surface)',
++              border: '1px solid var(--border)',
++              borderLeft: '3px solid var(--accent)',
++            }}>
++              <div className="typing-dots"><span></span><span></span><span></span></div>
+             </div>
+           </div>
+         )}
+diff --git a/src/screens/Dashboard.jsx b/src/screens/Dashboard.jsx
+index b09e783..a19c20c 100644
+--- a/src/screens/Dashboard.jsx
++++ b/src/screens/Dashboard.jsx
+@@ -1,12 +1,72 @@
+-import React, { useState } from 'react';
++import React, { useState, useEffect, useCallback } from 'react';
+ import { useGame } from '../context/GameContext';
+ import { generateDailyQuests } from '../lib/gemini';
+ import { PILLARS } from '../lib/progression';
+ 
++// --- Daily Goal Ring Component ---
++function GoalRing({ completed, goal = 4 }) {
++  const size = 120;
++  const strokeWidth = 5;
++  const radius = (size - strokeWidth * 2) / 2;
++  const circumference = 2 * Math.PI * radius;
++  const progress = Math.min(completed / goal, 1);
++  const offset = circumference - progress * circumference;
++  const isComplete = completed >= goal;
++
++  return (
++    <div className={`goal-ring-container ${isComplete ? 'goal-ring-complete' : ''}`}>
++      <svg className="goal-ring-svg" width={size} height={size}>
++        <circle className="goal-ring-bg" cx={size / 2} cy={size / 2} r={radius} />
++        <circle
++          className="goal-ring-fill"
++          cx={size / 2} cy={size / 2} r={radius}
++          strokeDasharray={circumference}
++          strokeDashoffset={offset}
++        />
++      </svg>
++      <div className="goal-ring-center">
++        {isComplete ? (
++          <>
++            <div style={{ fontSize: 24 }} className="animate-pop">🔥</div>
++            <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--accent)', marginTop: 2 }}>COMPLETE</div>
++          </>
++        ) : (
++          <>
++            <div className="mono" style={{ fontSize: 28, fontWeight: 800, color: 'var(--text-primary)' }}>{completed}</div>
++            <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>of {goal}</div>
++          </>
++        )}
++      </div>
++    </div>
++  );
++}
++
++// --- Floating XP Toast ---
++function XpFloater({ xp, onDone }) {
++  useEffect(() => {
++    const timer = setTimeout(onDone, 1500);
++    return () => clearTimeout(timer);
++  }, [onDone]);
++
++  return (
++    <div style={{
++      position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%, -50%)',
++      zIndex: 1500, pointerEvents: 'none',
++      animation: 'floatUp 1.5s ease-out forwards',
++    }}>
++      <div className="mono" style={{ fontSize: 24, fontWeight: 800, color: 'var(--accent)', textShadow: '0 0 20px rgba(16,185,129,0.5)' }}>
++        +{xp} XP
++      </div>
++    </div>
++  );
++}
++
+ export default function Dashboard() {
+   const { profile, settings, dailyQuests, questArcs, sideQuests, recentLog, rank, requiredXp, completeDaily, uncompleteDaily, addDailyQuestsBatch, autoGenerating } = useGame();
+   const [generating, setGenerating] = useState(false);
+   const [genError, setGenError] = useState('');
++  const [xpFloat, setXpFloat] = useState(null);
++  const [justCompleted, setJustCompleted] = useState(null);
+ 
+   const today = new Date();
+   const dateStr = today.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+@@ -36,43 +96,68 @@ export default function Dashboard() {
+     setGenerating(false);
+   };
+ 
++  const handleComplete = useCallback(async (questId) => {
++    const quest = dailyQuests.find(q => q.id === questId);
++    if (!quest) return;
++
++    setJustCompleted(questId);
++    setTimeout(() => setJustCompleted(null), 600);
++
++    // Show floating XP
++    setXpFloat(quest.xpReward || 20);
++    setTimeout(() => setXpFloat(null), 1500);
++
++    await completeDaily(questId);
++  }, [dailyQuests, completeDaily]);
++
+   const completedToday = dailyQuests.filter(q => q.status === 'completed').length;
+   const totalToday = dailyQuests.length;
++  const activeQuests = dailyQuests.filter(q => q.status !== 'completed');
++  const completedQuests = dailyQuests.filter(q => q.status === 'completed');
+ 
+   return (
+     <div className="animate-in">
+-      {/* Header */}
+-      <div style={{ marginBottom: 24 }}>
+-        <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 4 }}>{dateStr}</div>
+-        <h1>Level {profile?.level || 1} · {rank}</h1>
+-      </div>
++      {/* Floating XP */}
++      {xpFloat && <XpFloater xp={xpFloat} onDone={() => setXpFloat(null)} />}
++
++      {/* Hero Section */}
++      <div style={{ display: 'flex', alignItems: 'center', gap: 32, marginBottom: 32 }}>
++        {/* Goal Ring */}
++        <GoalRing completed={completedToday} goal={4} />
+ 
+-      {/* XP Bar + Streak */}
+-      <div style={{ display: 'flex', gap: 24, alignItems: 'flex-end', marginBottom: 32 }}>
++        {/* Info */}
+         <div style={{ flex: 1 }}>
+-          <div className="xp-bar">
+-            <div className="xp-bar-fill" style={{ width: `${xpPct}%` }} />
+-          </div>
+-          <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 6 }} className="mono">
+-            {profile?.xp || 0} / {requiredXp} XP
++          <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 4 }}>{dateStr}</div>
++          <h1 style={{ marginBottom: 12 }}>Level {profile?.level || 1} · {rank}</h1>
++
++          {/* XP Bar */}
++          <div style={{ maxWidth: 400 }}>
++            <div className="xp-bar">
++              <div className="xp-bar-fill" style={{ width: `${xpPct}%` }} />
++            </div>
++            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 6 }}>
++              <div style={{ fontSize: 12, color: 'var(--text-muted)' }} className="mono">
++                {profile?.xp || 0} / {requiredXp} XP
++              </div>
++              {(profile?.currentStreak || 0) > 0 && (
++                <div style={{ fontSize: 12, color: 'var(--color-wealth)', fontWeight: 600 }}>
++                  🔥 {profile.currentStreak} day streak
++                </div>
++              )}
++            </div>
+           </div>
+         </div>
+-        {(profile?.currentStreak || 0) > 0 && (
+-          <div className="card" style={{ padding: '10px 16px', textAlign: 'center', minWidth: 80 }}>
+-            <div className="mono" style={{ fontSize: 20, fontWeight: 800, color: 'var(--color-wealth)' }}>🔥 {profile.currentStreak}</div>
+-            <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>day streak</div>
+-          </div>
+-        )}
+       </div>
+ 
+       {/* Today's Quests */}
+       <div style={{ marginBottom: 40 }}>
+         <div className="section-header">
+           <div className="section-title">
+-            Today's Quests {totalToday > 0 && (
+-              completedToday >= 4 
+-                ? <span style={{ color: 'var(--accent)', fontWeight: 'normal', fontSize: 13 }}> (Daily Goal Completed 🔥)</span>
+-                : <span style={{ fontWeight: 'normal', fontSize: 13, color: 'var(--text-muted)' }}> ({completedToday}/4)</span>
++            Today's Quests
++            {totalToday > 0 && (
++              completedToday >= 4
++                ? <span style={{ color: 'var(--accent)', fontWeight: 'normal', fontSize: 13, marginLeft: 8 }}>Daily Goal Completed 🔥</span>
++                : <span style={{ fontWeight: 'normal', fontSize: 13, color: 'var(--text-muted)', marginLeft: 8 }}>({completedToday}/4)</span>
+             )}
+           </div>
+           {totalToday > 0 && (
+@@ -96,7 +181,7 @@ export default function Dashboard() {
+             ) : (
+               <>
+                 <p style={{ color: 'var(--text-secondary)', marginBottom: 16 }}>No quests for today yet.</p>
+-                <button className="btn btn-primary" onClick={handleGenerateDaily} disabled={generating}>
++                <button className="btn-done" onClick={handleGenerateDaily} disabled={generating} style={{ padding: '10px 24px', fontSize: 14 }}>
+                   {generating ? 'Generating...' : 'Generate Daily Quests'}
+                 </button>
+               </>
+@@ -104,39 +189,39 @@ export default function Dashboard() {
+           </div>
+         ) : (
+           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+-            {dailyQuests.filter(q => q.status !== 'completed').map(q => {
+-              return (
+-                <div key={q.id} className="card" style={{ padding: '14px 18px', display: 'flex', alignItems: 'center', gap: 14 }}>
+-                  <div style={{ flex: 1 }}>
+-                    <div style={{ fontSize: 14, fontWeight: 600 }}>{q.title}</div>
+-                    {q.desc && <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>{q.desc}</div>}
+-                  </div>
+-                  <span className={`badge badge-${q.pillar}`}>{q.pillar}</span>
+-                  <span className="mono" style={{ fontSize: 12, color: 'var(--text-muted)', minWidth: 44, textAlign: 'right' }}>+{q.xpReward || 20}</span>
+-                  <button className="btn btn-primary btn-sm" onClick={() => completeDaily(q.id)}>Done</button>
++            {activeQuests.map((q, i) => (
++              <div
++                key={q.id}
++                className={`quest-card quest-${q.pillar} animate-slide-up stagger-${Math.min(i + 1, 8)} ${justCompleted === q.id ? 'quest-completed' : ''}`}
++              >
++                <div style={{ flex: 1 }}>
++                  <div className="quest-title" style={{ fontSize: 14, fontWeight: 600 }}>{q.title}</div>
++                  {q.desc && <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>{q.desc}</div>}
+                 </div>
+-              );
+-            })}
+-            
++                <span className={`badge badge-${q.pillar}`}>{q.pillar}</span>
++                <span className="mono" style={{ fontSize: 12, color: 'var(--text-muted)', minWidth: 44, textAlign: 'right' }}>+{q.xpReward || 20}</span>
++                <button className="btn-done" onClick={() => handleComplete(q.id)}>Done</button>
++              </div>
++            ))}
++
+             {completedToday > 0 && (
+               <details style={{ marginTop: 16 }}>
+                 <summary style={{ cursor: 'pointer', fontSize: 13, color: 'var(--text-muted)', padding: '8px 0', userSelect: 'none' }}>
+                   Show completed ({completedToday})
+                 </summary>
+                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 8 }}>
+-                  {dailyQuests.filter(q => q.status === 'completed').map(q => {
+-                    return (
+-                      <div key={q.id} className="card" style={{ padding: '14px 18px', display: 'flex', alignItems: 'center', gap: 14, opacity: 0.7 }}>
+-                        <div style={{ flex: 1 }}>
+-                          <div style={{ fontSize: 14, fontWeight: 600, textDecoration: 'line-through' }}>{q.title}</div>
+-                          {q.desc && <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>{q.desc}</div>}
+-                        </div>
+-                        <span className={`badge badge-${q.pillar}`}>{q.pillar}</span>
+-                        <span className="mono" style={{ fontSize: 12, color: 'var(--text-muted)', minWidth: 44, textAlign: 'right' }}>+{q.xpReward || 20}</span>
+-                        <button className="btn btn-secondary btn-sm" onClick={() => uncompleteDaily(q.id)} style={{ padding: '4px 8px', fontSize: 12 }}>Undo</button>
++                  {completedQuests.map(q => (
++                    <div key={q.id} className="quest-card quest-completed" style={{ cursor: 'default' }}>
++                      <div className="check-burst" style={{ flexShrink: 0 }}>✓</div>
++                      <div style={{ flex: 1 }}>
++                        <div className="quest-title" style={{ fontSize: 14, fontWeight: 600 }}>{q.title}</div>
++                        {q.desc && <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>{q.desc}</div>}
+                       </div>
+-                    );
+-                  })}
++                      <span className={`badge badge-${q.pillar}`}>{q.pillar}</span>
++                      <span className="mono" style={{ fontSize: 12, color: 'var(--text-muted)', minWidth: 44, textAlign: 'right' }}>+{q.xpReward || 20}</span>
++                      <button className="btn btn-sm" onClick={() => uncompleteDaily(q.id)} style={{ fontSize: 11 }}>Undo</button>
++                    </div>
++                  ))}
+                 </div>
+               </details>
+             )}
+@@ -146,23 +231,23 @@ export default function Dashboard() {
+ 
+       {/* Active Story Arcs */}
+       {activeArcs.length > 0 && (
+-        <div>
++        <div className="animate-slide-up" style={{ animationDelay: '200ms' }}>
+           <div className="section-header">
+             <div className="section-title">Active Story Arcs</div>
+           </div>
+           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 12 }}>
+-            {activeArcs.map(arc => {
++            {activeArcs.map((arc, i) => {
+               const doneSteps = arc.steps?.filter(s => s.done).length || 0;
+               const totalSteps = arc.steps?.length || 1;
+               const pct = (doneSteps / totalSteps) * 100;
+               const pillar = PILLARS[arc.pillar] || {};
+               return (
+-                <div key={arc.id} className="card" style={{ padding: 18 }}>
+-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
++                <div key={arc.id} className={`card animate-slide-up stagger-${Math.min(i + 1, 8)}`} style={{ padding: 18 }}>
++                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+                     <span style={{ fontSize: 14, fontWeight: 600, flex: 1 }}>{arc.title}</span>
+                     <span className={`badge badge-${arc.pillar}`}>{arc.pillar}</span>
+                   </div>
+-                  <div className="progress-bar" style={{ marginBottom: 6 }}>
++                  <div className="progress-bar" style={{ marginBottom: 6, height: 5 }}>
+                     <div className="progress-bar-fill" style={{ width: `${pct}%`, background: pillar.color || 'var(--accent)' }} />
+                   </div>
+                   <div className="mono" style={{ fontSize: 11, color: 'var(--text-muted)' }}>{doneSteps} / {totalSteps} steps</div>
+diff --git a/src/screens/Onboarding.jsx b/src/screens/Onboarding.jsx
+index bf9ac00..4e9ab10 100644
+--- a/src/screens/Onboarding.jsx
++++ b/src/screens/Onboarding.jsx
+@@ -3,21 +3,20 @@ import { useGame } from '../context/GameContext';
+ import { generateOnboardingQuests } from '../lib/gemini';
+ import { PILLARS } from '../lib/progression';
+ 
+-const TOTAL_STEPS = 9;
++const TOTAL_STEPS = 7;
+ 
+ export default function Onboarding() {
+   const { settings, updateSettings, initProfile, finishOnboarding } = useGame();
+ 
+   const [step, setStep] = useState(1);
+   const [name, setName] = useState('');
++  const [current, setCurrent] = useState('');
+   const [healthNotes, setHealthNotes] = useState('');
+   const [wealthNotes, setWealthNotes] = useState('');
+   const [relationshipsNotes, setRelationshipsNotes] = useState('');
+   const [endgame, setEndgame] = useState('');
+-  const [current, setCurrent] = useState('');
+   const [apiKey, setApiKey] = useState(settings?.geminiKey || '');
+   const [error, setError] = useState('');
+-  const [retryCountdown, setRetryCountdown] = useState(0);
+   const [generatedData, setGeneratedData] = useState(null);
+ 
+   const next = () => { setError(''); setStep(s => s + 1); };
+@@ -72,16 +71,20 @@ export default function Onboarding() {
+   return (
+     <div style={{ position: 'fixed', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24, background: 'var(--bg-base)' }}>
+       <div style={{ width: '100%', maxWidth: 520 }}>
+-        {/* Step indicator */}
++
++        {/* Progress bar */}
+         {step <= 7 && (
+-          <div style={{ textAlign: 'center', marginBottom: 16, fontSize: 12, color: 'var(--text-muted)' }}>
+-            {step} / {TOTAL_STEPS}
++          <div className="onboarding-progress">
++            <div
++              className="onboarding-progress-fill"
++              style={{ width: `${(step / TOTAL_STEPS) * 100}%` }}
++            />
+           </div>
+         )}
+ 
+-        <div className="card animate-in" key={step} style={{ padding: 32 }}>
++        <div className="card animate-slide-in" key={step} style={{ padding: 32 }}>
+ 
+-          {/* Step 1: Welcome */}
++          {/* Step 1: Welcome + Name */}
+           {step === 1 && (
+             <div>
+               <h1 style={{ marginBottom: 8 }}>Welcome to Gameable</h1>
+@@ -89,8 +92,8 @@ export default function Onboarding() {
+                 Turn your life into a game. Your journey spans three pillars:
+               </p>
+               <div style={{ display: 'flex', gap: 12, marginBottom: 28 }}>
+-                {Object.entries(PILLARS).map(([key, p]) => (
+-                  <div key={key} className="card" style={{ flex: 1, padding: 16, textAlign: 'center' }}>
++                {Object.entries(PILLARS).map(([key, p], i) => (
++                  <div key={key} className={`card animate-pop stagger-${i + 1}`} style={{ flex: 1, padding: 16, textAlign: 'center' }}>
+                     <div style={{ fontSize: 24, marginBottom: 4 }}>{p.icon}</div>
+                     <div style={{ fontSize: 13, fontWeight: 600, color: p.color }}>{p.label}</div>
+                   </div>
+@@ -101,53 +104,53 @@ export default function Onboarding() {
+             </div>
+           )}
+ 
+-          {/* Step 2: Health */}
++          {/* Step 2: Where you are now */}
+           {step === 2 && (
+             <div>
+-              <h1 style={{ marginBottom: 4 }}>❤️ Health</h1>
+-              <p style={{ color: 'var(--text-secondary)', fontSize: 14, marginBottom: 20 }}>Tell us about your physical and mental health.</p>
+-              <label className="label">Your health situation</label>
+-              <textarea rows={4} value={healthNotes} onChange={e => setHealthNotes(e.target.value)} placeholder="Exercise habits, diet, sleep, health goals..." />
++              <h1 style={{ marginBottom: 4 }}>Where are you now?</h1>
++              <p style={{ color: 'var(--text-secondary)', fontSize: 14, marginBottom: 20 }}>Be honest about where you stand today. This is your starting point.</p>
++              <label className="label">Your current situation</label>
++              <textarea rows={4} value={current} onChange={e => setCurrent(e.target.value)} placeholder="What does your day-to-day look like right now?" />
+             </div>
+           )}
+ 
+-          {/* Step 3: Wealth */}
++          {/* Step 3: Health */}
+           {step === 3 && (
+             <div>
+-              <h1 style={{ marginBottom: 4 }}>💰 Wealth</h1>
+-              <p style={{ color: 'var(--text-secondary)', fontSize: 14, marginBottom: 20 }}>Tell us about your financial and career situation.</p>
+-              <label className="label">Your wealth situation</label>
+-              <textarea rows={4} value={wealthNotes} onChange={e => setWealthNotes(e.target.value)} placeholder="Income, savings, career goals, skills you're building..." />
++              <h1 style={{ marginBottom: 4 }}>❤️ Health</h1>
++              <p style={{ color: 'var(--text-secondary)', fontSize: 14, marginBottom: 20 }}>How's your body and mind doing?</p>
++              <label className="label">Health right now</label>
++              <textarea rows={4} value={healthNotes} onChange={e => setHealthNotes(e.target.value)} placeholder="Exercise, diet, sleep, energy levels, mental health..." />
+             </div>
+           )}
+ 
+-          {/* Step 4: Relationships */}
++          {/* Step 4: Wealth */}
+           {step === 4 && (
+             <div>
+-              <h1 style={{ marginBottom: 4 }}>🤝 Relationships</h1>
+-              <p style={{ color: 'var(--text-secondary)', fontSize: 14, marginBottom: 20 }}>Tell us about your social and relational life.</p>
+-              <label className="label">Your relationships situation</label>
+-              <textarea rows={4} value={relationshipsNotes} onChange={e => setRelationshipsNotes(e.target.value)} placeholder="Family, friends, networking, relationship goals..." />
++              <h1 style={{ marginBottom: 4 }}>💰 Wealth</h1>
++              <p style={{ color: 'var(--text-secondary)', fontSize: 14, marginBottom: 20 }}>Where do you stand financially and professionally?</p>
++              <label className="label">Wealth right now</label>
++              <textarea rows={4} value={wealthNotes} onChange={e => setWealthNotes(e.target.value)} placeholder="Job, income, savings, skills, side projects..." />
+             </div>
+           )}
+ 
+-          {/* Step 5: Endgame */}
++          {/* Step 5: Relationships */}
+           {step === 5 && (
+             <div>
+-              <h1 style={{ marginBottom: 4 }}>The Endgame</h1>
+-              <p style={{ color: 'var(--text-secondary)', fontSize: 14, marginBottom: 20 }}>Describe the ultimate version of yourself.</p>
+-              <label className="label">Your ideal future</label>
+-              <textarea rows={4} value={endgame} onChange={e => setEndgame(e.target.value)} placeholder="What does your ideal life look like in 5 years?" />
++              <h1 style={{ marginBottom: 4 }}>🤝 Relationships</h1>
++              <p style={{ color: 'var(--text-secondary)', fontSize: 14, marginBottom: 20 }}>How's your social life and connections?</p>
++              <label className="label">Relationships right now</label>
++              <textarea rows={4} value={relationshipsNotes} onChange={e => setRelationshipsNotes(e.target.value)} placeholder="Family, friends, partner, networking, community..." />
+             </div>
+           )}
+ 
+-          {/* Step 6: Current */}
++          {/* Step 6: Endgame */}
+           {step === 6 && (
+             <div>
+-              <h1 style={{ marginBottom: 4 }}>Your Origin</h1>
+-              <p style={{ color: 'var(--text-secondary)', fontSize: 14, marginBottom: 20 }}>Where do you honestly stand right now?</p>
+-              <label className="label">Current position</label>
+-              <textarea rows={4} value={current} onChange={e => setCurrent(e.target.value)} placeholder="Be honest about where you are today..." />
++              <h1 style={{ marginBottom: 4 }}>The Endgame</h1>
++              <p style={{ color: 'var(--text-secondary)', fontSize: 14, marginBottom: 20 }}>Where do you want to be? Think big.</p>
++              <label className="label">Your ideal life</label>
++              <textarea rows={4} value={endgame} onChange={e => setEndgame(e.target.value)} placeholder="What does winning look like for you in 1-5 years?" />
+             </div>
+           )}
+ 
+@@ -171,13 +174,11 @@ export default function Onboarding() {
+           {/* Step 8: Loading */}
+           {step === 8 && (
+             <div style={{ textAlign: 'center', padding: '40px 0' }}>
+-              <div className="spinner" style={{ width: 32, height: 32, margin: '0 auto 24px' }} />
+-              <h2 style={{ marginBottom: 8 }}>The Architect is analyzing your path...</h2>
+-              <p style={{ fontSize: 13, color: 'var(--text-muted)' }}>
+-                {retryCountdown > 0
+-                  ? `Rate limited. Auto-retrying in ${retryCountdown}s...`
+-                  : 'Generating personalized quests from your life data.'}
+-              </p>
++              <div style={{ animation: 'pulseAccent 1.5s ease-in-out infinite', margin: '0 auto 24px' }}>
++                <div className="spinner" style={{ width: 32, height: 32, margin: '0 auto' }} />
++              </div>
++              <h2 className="animate-slide-up stagger-1" style={{ marginBottom: 8 }}>Building your quest plan...</h2>
++              <p className="animate-slide-up stagger-2" style={{ fontSize: 13, color: 'var(--text-muted)' }}>This takes a few seconds.</p>
+             </div>
+           )}
+ 
+@@ -185,14 +186,14 @@ export default function Onboarding() {
+           {step === 9 && generatedData && (
+             <div>
+               <h1 style={{ marginBottom: 4 }}>Your Quest Plan</h1>
+-              <p style={{ color: 'var(--text-secondary)', fontSize: 14, marginBottom: 24 }}>Review the AI-generated plan for your journey.</p>
++              <p style={{ color: 'var(--text-secondary)', fontSize: 14, marginBottom: 24 }}>Here's what we came up with. Accept it or regenerate.</p>
+ 
+               {generatedData.storyArcs && generatedData.storyArcs.length > 0 && (
+                 <div style={{ marginBottom: 24 }}>
+                   <div className="section-title" style={{ marginBottom: 12 }}>Story Arcs</div>
+                   <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                     {generatedData.storyArcs.map((arc, i) => (
+-                      <div key={i} className="card" style={{ padding: 16 }}>
++                      <div key={i} className={`card animate-slide-up stagger-${i + 1}`} style={{ padding: 16 }}>
+                         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                           <span style={{ fontWeight: 600, fontSize: 14 }}>{arc.title}</span>
+                           <span className={`badge badge-${arc.pillar}`}>{arc.pillar}</span>
+@@ -209,13 +210,16 @@ export default function Onboarding() {
+                 <div style={{ marginBottom: 24 }}>
+                   <div className="section-title" style={{ marginBottom: 12 }}>Side Quests</div>
+                   <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+-                    {generatedData.sideQuests.map((q, i) => (
+-                      <div key={i} className="card" style={{ padding: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
+-                        <span style={{ fontSize: 13, fontWeight: 600, flex: 1 }}>{q.title}</span>
+-                        <span className={`badge badge-${q.pillar}`}>{q.pillar}</span>
+-                        <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{q.frequency}</span>
+-                      </div>
+-                    ))}
++                    {generatedData.sideQuests.map((q, i) => {
++                      const offset = (generatedData.storyArcs?.length || 0) + i + 1;
++                      return (
++                        <div key={i} className={`card animate-slide-up stagger-${offset}`} style={{ padding: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
++                          <span style={{ fontSize: 13, fontWeight: 600, flex: 1 }}>{q.title}</span>
++                          <span className={`badge badge-${q.pillar}`}>{q.pillar}</span>
++                          <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{q.frequency}</span>
++                        </div>
++                      );
++                    })}
+                   </div>
+                 </div>
+               )}
+@@ -229,10 +233,10 @@ export default function Onboarding() {
+               <div style={{ flex: 1 }} />
+               {isSkippable && <button className="btn" onClick={next}>Skip</button>}
+               {step < 7 && (
+-                <button className="btn btn-primary" onClick={next} disabled={!canContinue()}>Continue</button>
++                <button className="btn btn-done" onClick={next} disabled={!canContinue()}>Continue</button>
+               )}
+               {step === 7 && (
+-                <button className="btn btn-primary" onClick={handleGenerate} disabled={!canContinue()}>Generate Quests</button>
++                <button className="btn btn-done" onClick={handleGenerate} disabled={!canContinue()}>Generate Quests</button>
+               )}
+             </div>
+           )}
+@@ -241,7 +245,7 @@ export default function Onboarding() {
+             <div style={{ display: 'flex', gap: 8, marginTop: 24 }}>
+               <button className="btn" onClick={() => { setStep(7); setGeneratedData(null); }}>Regenerate</button>
+               <div style={{ flex: 1 }} />
+-              <button className="btn btn-primary" onClick={handleAccept}>Accept & Begin</button>
++              <button className="btn btn-done" onClick={handleAccept}>Accept & Begin</button>
+             </div>
+           )}
+         </div>
+diff --git a/src/screens/QuestBoard.jsx b/src/screens/QuestBoard.jsx
+index 4a1654d..7ab8100 100644
+--- a/src/screens/QuestBoard.jsx
++++ b/src/screens/QuestBoard.jsx
+@@ -13,76 +13,102 @@ export default function QuestBoard() {
+       <h1 style={{ marginBottom: 32 }}>Quest Board</h1>
+ 
+       {/* Main Quest */}
+-      <div style={{ marginBottom: 32 }}>
+-        <div className="section-title" style={{ marginBottom: 12 }}>Main Quest</div>
+-        <div className="card" style={{ padding: 24 }}>
+-          <div style={{ fontSize: 20, fontWeight: 700, marginBottom: 6 }}>{profile?.endgame || 'No endgame set'}</div>
+-          <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>Current: {profile?.current || '—'}</div>
++      <div style={{ marginBottom: 32 }} className="animate-slide-up stagger-1">
++        <div className="section-title" style={{ marginBottom: 12 }}>Your Endgame</div>
++        <div className="main-quest-card">
++          <div style={{ fontSize: 22, fontWeight: 800, marginBottom: 6, lineHeight: 1.3 }}>
++            {profile?.endgame || 'No endgame set'}
++          </div>
++          <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>
++            Current: {profile?.current || '—'}
++          </div>
+         </div>
+       </div>
+ 
+       {/* Story Arcs */}
+-      <div style={{ marginBottom: 32 }}>
++      <div style={{ marginBottom: 32 }} className="animate-slide-up stagger-2">
+         <div className="section-title" style={{ marginBottom: 12 }}>Story Arcs</div>
+         {questArcs.length === 0 ? (
+           <div className="card" style={{ padding: 24, textAlign: 'center', color: 'var(--text-muted)' }}>No story arcs yet.</div>
+         ) : (
+           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+-            {questArcs.map(arc => {
++            {questArcs.map((arc, idx) => {
+               const isExpanded = expandedArc === arc.id;
+               const doneSteps = arc.steps?.filter(s => s.done).length || 0;
+               const totalSteps = arc.steps?.length || 0;
++              const pct = totalSteps > 0 ? (doneSteps / totalSteps) * 100 : 0;
+               const allDone = arc.status === 'completed';
+               const pillar = PILLARS[arc.pillar] || {};
+ 
+               return (
+-                <div key={arc.id} className="card" style={{ overflow: 'hidden' }}>
++                <div key={arc.id} className={`card animate-slide-up stagger-${Math.min(idx + 1, 8)}`} style={{ overflow: 'hidden' }}>
++                  {/* Header */}
+                   <div
+                     style={{ padding: 18, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 12 }}
+                     onClick={() => toggleArc(arc.id)}
+                   >
+-                    <span style={{ color: 'var(--text-muted)', fontSize: 12, transition: 'transform 150ms', transform: isExpanded ? 'rotate(90deg)' : 'rotate(0deg)' }}>▶</span>
++                    <span style={{
++                      color: 'var(--text-muted)', fontSize: 12,
++                      transition: 'transform 200ms ease',
++                      transform: isExpanded ? 'rotate(90deg)' : 'rotate(0deg)',
++                      display: 'inline-block',
++                    }}>▶</span>
+                     <div style={{ flex: 1 }}>
+-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
++                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                         <span style={{ fontSize: 14, fontWeight: 600 }}>{arc.title}</span>
+                         <span className={`badge badge-${arc.pillar}`}>{arc.pillar}</span>
+                         {allDone && <span className="badge" style={{ background: 'var(--accent-dim)', color: 'var(--accent)' }}>Completed</span>}
+                       </div>
+-                      <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>{arc.desc}</div>
++                      <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{arc.desc}</div>
++                      {/* Mini progress bar */}
++                      <div className="progress-bar" style={{ marginTop: 8, height: 3 }}>
++                        <div className="progress-bar-fill" style={{ width: `${pct}%`, background: pillar.color || 'var(--accent)' }} />
++                      </div>
+                     </div>
+                     <div className="mono" style={{ fontSize: 12, color: 'var(--text-muted)' }}>{doneSteps}/{totalSteps}</div>
+                   </div>
+ 
+-                  {isExpanded && arc.steps && (
+-                    <div style={{ borderTop: '1px solid var(--border)', padding: '12px 18px 18px' }}>
+-                      {arc.steps.map((step, i) => (
+-                        <div
+-                          key={i}
+-                          style={{
+-                            display: 'flex', alignItems: 'flex-start', gap: 10, padding: '8px 0',
+-                            opacity: step.done ? 0.5 : 1
+-                          }}
+-                        >
+-                          <button
+-                            onClick={() => !step.done && completeArcStep(arc.id, i)}
+-                            disabled={step.done}
+-                            style={{
+-                              width: 18, height: 18, borderRadius: 4, border: `1px solid ${step.done ? 'var(--accent)' : 'var(--border)'}`,
+-                              background: step.done ? 'var(--accent-dim)' : 'transparent', cursor: step.done ? 'default' : 'pointer',
+-                              display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 2,
+-                              color: 'var(--accent)', fontSize: 11, outline: 'none',
+-                            }}
+-                          >
+-                            {step.done && '✓'}
+-                          </button>
+-                          <div>
+-                            <div style={{ fontSize: 13, fontWeight: 500, textDecoration: step.done ? 'line-through' : 'none' }}>{step.title}</div>
+-                            {step.desc && <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>{step.desc}</div>}
+-                          </div>
++                  {/* Expanded Steps — Timeline */}
++                  <div style={{
++                    maxHeight: isExpanded ? '1000px' : '0',
++                    overflow: 'hidden',
++                    transition: 'max-height 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
++                  }}>
++                    {arc.steps && (
++                      <div style={{ borderTop: '1px solid var(--border)', padding: '16px 18px 18px' }}>
++                        <div className="timeline">
++                          {arc.steps.map((step, i) => (
++                            <div key={i} className="timeline-item">
++                              <div className={`timeline-dot ${step.done ? 'done' : ''}`} />
++                              <div style={{ flex: 1, display: 'flex', alignItems: 'flex-start', gap: 10 }}>
++                                <div style={{ flex: 1 }}>
++                                  <div style={{
++                                    fontSize: 13, fontWeight: 500,
++                                    textDecoration: step.done ? 'line-through' : 'none',
++                                    opacity: step.done ? 0.5 : 1,
++                                  }}>{step.title}</div>
++                                  {step.desc && (
++                                    <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2, opacity: step.done ? 0.5 : 1 }}>
++                                      {step.desc}
++                                    </div>
++                                  )}
++                                </div>
++                                {!step.done && (
++                                  <button
++                                    className="btn-done"
++                                    onClick={(e) => { e.stopPropagation(); completeArcStep(arc.id, i); }}
++                                    style={{ fontSize: 11, padding: '3px 10px' }}
++                                  >
++                                    Complete
++                                  </button>
++                                )}
++                              </div>
++                            </div>
++                          ))}
+                         </div>
+-                      ))}
+-                    </div>
+-                  )}
++                      </div>
++                    )}
++                  </div>
+                 </div>
+               );
+             })}
+@@ -91,24 +117,27 @@ export default function QuestBoard() {
+       </div>
+ 
+       {/* Side Quests */}
+-      <div style={{ marginBottom: 32 }}>
++      <div style={{ marginBottom: 32 }} className="animate-slide-up stagger-3">
+         <div className="section-title" style={{ marginBottom: 12 }}>Side Quests</div>
+         {sideQuests.length === 0 ? (
+           <div className="card" style={{ padding: 24, textAlign: 'center', color: 'var(--text-muted)' }}>No side quests yet.</div>
+         ) : (
+           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+-            {sideQuests.map(q => {
++            {sideQuests.map((q, i) => {
+               const done = q.status === 'completed';
+               return (
+-                <div key={q.id} className="card" style={{ padding: '14px 18px', display: 'flex', alignItems: 'center', gap: 12, opacity: done ? 0.5 : 1 }}>
++                <div
++                  key={q.id}
++                  className={`quest-card quest-${q.pillar} ${done ? 'quest-completed' : ''} animate-slide-up stagger-${Math.min(i + 1, 8)}`}
++                >
+                   <div style={{ flex: 1 }}>
+-                    <div style={{ fontSize: 14, fontWeight: 600, textDecoration: done ? 'line-through' : 'none' }}>{q.title}</div>
++                    <div className="quest-title" style={{ fontSize: 14, fontWeight: 600 }}>{q.title}</div>
+                     {q.desc && <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>{q.desc}</div>}
+                   </div>
+                   <span className={`badge badge-${q.pillar}`}>{q.pillar}</span>
+-                  <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{q.frequency}</span>
+-                  {!done && <button className="btn btn-sm btn-primary" onClick={() => completeSideQuest(q.id)}>Done</button>}
+-                  {done && <span style={{ color: 'var(--accent)', fontSize: 14 }}>✓</span>}
++                  <span style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 500 }}>{q.frequency}</span>
++                  {!done && <button className="btn-done" onClick={() => completeSideQuest(q.id)}>Done</button>}
++                  {done && <div className="check-burst" style={{ animation: 'none', width: 24, height: 24, fontSize: 12 }}>✓</div>}
+                 </div>
+               );
+             })}
+@@ -116,16 +145,23 @@ export default function QuestBoard() {
+         )}
+       </div>
+ 
+-      {/* Completed History */}
++      {/* Recent Activity */}
+       {recentLog.length > 0 && (
+-        <div>
++        <div className="animate-slide-up stagger-4">
+           <div className="section-title" style={{ marginBottom: 12 }}>Recent Activity</div>
+-          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
++          <div className="card" style={{ padding: '4px 0', overflow: 'hidden' }}>
+             {recentLog.slice(0, 15).map((entry, i) => (
+-              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '8px 0', borderBottom: '1px solid var(--border)' }}>
++              <div
++                key={i}
++                style={{
++                  display: 'flex', alignItems: 'center', gap: 12,
++                  padding: '10px 18px',
++                  borderBottom: i < Math.min(recentLog.length, 15) - 1 ? '1px solid var(--border)' : 'none',
++                }}
++              >
+                 <span className={`badge badge-${entry.pillar}`}>{entry.pillar}</span>
+-                <span style={{ fontSize: 12, color: 'var(--text-secondary)', flex: 1 }}>{entry.questType}</span>
+-                <span className="mono" style={{ fontSize: 12, color: 'var(--accent)' }}>+{entry.xpEarned} XP</span>
++                <span style={{ fontSize: 12, color: 'var(--text-secondary)', flex: 1, textTransform: 'capitalize' }}>{entry.questType}</span>
++                <span className="mono" style={{ fontSize: 12, color: 'var(--accent)', fontWeight: 600 }}>+{entry.xpEarned} XP</span>
+                 <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{new Date(entry.completedAt).toLocaleDateString()}</span>
+               </div>
+             ))}
+diff --git a/src/screens/Settings.jsx b/src/screens/Settings.jsx
+index 7aa3659..3839801 100644
+--- a/src/screens/Settings.jsx
++++ b/src/screens/Settings.jsx
+@@ -31,7 +31,7 @@ export default function Settings() {
+     const url = URL.createObjectURL(blob);
+     const a = document.createElement('a');
+     a.href = url;
+-    a.download = 'life-rpg-backup.json';
++    a.download = `gameable-backup-${new Date().toISOString().split('T')[0]}.json`;
+     a.click();
+     URL.revokeObjectURL(url);
+   };
